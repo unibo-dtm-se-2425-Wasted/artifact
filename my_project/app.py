@@ -92,7 +92,25 @@ if items:
         st.table(expired[["Name", "Expiration Date", "Quantity", "Unit"]])
 
     # ---------- Data Table ----------
-    st.dataframe(df[["Name", "Category", "Purchase Date", "Expiration Date", "Quantity", "Unit", "Status"]])
+    # 1. Definiamo una funzione per colorare solo la cella dello stato.
+   #    Questa funzione legge il valore della cella e restituisce un colore di sfondo.
+    def highlight_status(val):
+       if val == "❌ Expired":
+           return 'background-color: #ffcccc' # Rosso chiaro
+       elif val == "⚠️ Expiring Soon":
+           return 'background-color: #fff2cc' # Arancione chiaro
+       elif val == "✅ OK":
+           return 'background-color: #ccffcc' # Verde chiaro
+       return '' # Restituisce una stringa vuota per le altre celle
+
+   # 2. Creiamo un oggetto di stile applicando la funzione solo alla colonna "Status".
+   #    Il metodo .applymap() lavora su ogni singola cella.
+    styled_df = df.style.applymap(highlight_status, subset=["Status"])
+
+   # 3. Visualizziamo il DataFrame stilizzato usando st.dataframe.
+   #    Streamlit mostrerà tutte le colonne del DataFrame 'df', ma con lo stile applicato
+   #    solo alla colonna "Status".
+    st.dataframe(styled_df)
 
     # # ✅ 3. "What Can I Cook Today?" Button
 st.subheader("🍽️ Meal Inspiration")
