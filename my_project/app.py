@@ -169,11 +169,22 @@ if items:
     status_counts = df["Status"].value_counts()
     st.write(status_counts)
 
+    # Mappatura personalizzata tra stati e colori
+    status_colors = {
+        "❌ Expired": "#ffcccc",
+        "⚠️ Expiring Soon": "#fff2cc",
+        "✅ OK": "#ccffcc"
+    }
+
+    # Assicurati che l'ordine dei nomi corrisponda all'ordine dei colori
+    ordered_names = status_counts.index.tolist()
+    ordered_colors = [status_colors[name] for name in ordered_names]
+
     fig = px.pie(
-        names=status_counts.index,
+        names=ordered_names,
         values=status_counts.values,
         title="Distribuzione dello stato del cibo",
-        color_discrete_sequence=px.colors.sequential.RdBu
+        color_discrete_sequence=ordered_colors
     )
     st.plotly_chart(fig, use_container_width=True)
 
