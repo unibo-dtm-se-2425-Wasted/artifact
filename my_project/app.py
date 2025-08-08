@@ -2,24 +2,22 @@
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import plotly.express as px
 import requests
 
-from db.database import initialize_db, insert_food_item, get_all_food_items
+from my_project.db.database import initialize_db, insert_food_item, get_all_food_items
 
 # --- FUNZIONI DI LOGICA ---
 
 def calculate_statistics(df):
-    """Calcola e restituisce le statistiche chiave dal DataFrame."""
     total_items = len(df)
     expired_items = len(df[df['Status'] == '❌ Expired'])
     ok_items = len(df[df['Status'] == '✅ OK']) + len(df[df['Status'] == '⚠️ Expiring Soon'])
     return total_items, expired_items, ok_items
 
 def check_status(exp_date_str):
-    """Controlla lo stato di un articolo in base alla data di scadenza."""
     today = datetime.today().date()
     exp = datetime.strptime(exp_date_str, "%Y-%m-%d").date()
     if exp < today:
@@ -30,14 +28,13 @@ def check_status(exp_date_str):
         return "✅ OK"
 
 def highlight_status(val):
-    """Funzione per colorare le celle della colonna 'Status' nel DataFrame."""
     if val == "❌ Expired":
-        return 'background-color: #ffcccc' # Rosso chiaro
+        return 'background-color: #ffcccc'
     elif val == "⚠️ Expiring Soon":
-        return 'background-color: #fff2cc' # Arancione chiaro
+        return 'background-color: #fff2cc'
     elif val == "✅ OK":
-        return 'background-color: #ccffcc' # Verde chiaro
-    return '' # Restituisce una stringa vuota per le altre celle
+        return 'background-color: #ccffcc'
+    return ''
 
 # ----------------------------------------------------------------------------------
 
@@ -69,13 +66,19 @@ st.markdown("""
     .stDataFrame th {
         background-color: #CED4E0;
     }
+
+    /* Applica colore beige ai dataframe */
+    [data-testid="stDataFrame"] {
+        background-color: #f5f5dc !important;
+        padding: 20px;
+        border-radius: 10px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-
 st.title("🥦 Food Waste Manager")
 
-# ---------- Form nella sidebar per aggiungere un articolo ----------
+# ---------- Sidebar: aggiunta articolo ----------
 with st.sidebar.form("add_food"):
     st.header("➕ Aggiungi un nuovo articolo")
 
@@ -92,7 +95,7 @@ with st.sidebar.form("add_food"):
         insert_food_item(name, category, purchase_date, expiration_date, quantity, unit)
         st.success(f"'{name}' è stato aggiunto al tuo frigo! Aggiorna la pagina per vederlo.")
 
-# ---------- Visualizzazione degli articoli ----------
+# ---------- Visualizzazione articoli ----------
 st.subheader("📋 Lista Cibo")
 
 items = get_all_food_items()
@@ -100,22 +103,20 @@ items = get_all_food_items()
 if items:
     df = pd.DataFrame(items, columns=["ID", "Name", "Category", "Purchase Date", "Expiration Date", "Quantity", "Unit"])
     
-    # 1. Calcolo della colonna Status
     df["Status"] = df["Expiration Date"].apply(check_status)
 
-    # 2. Avvisi visivi per gli articoli in scadenza
     expiring_soon = df[df["Status"] == "⚠️ Expiring Soon"]
     expired = df[df["Status"] == "❌ Expired"]
 
     if not expiring_soon.empty:
         st.warning("⚠️ I seguenti articoli stanno per scadere:")
-        st.table(expiring_soon[["Name", "Expiration Date", "Quantity", "Unit"]])
+        st.dataframe(expiring_soon[["Name", "Expiration Date", "Quantity", "Unit"]])
 
     if not expired.empty:
         st.error("❌ I seguenti articoli sono scaduti:")
-        st.table(expired[["Name", "Expiration Date", "Quantity", "Unit"]])
+        st.dataframe(expired[["Name", "Expiration Date", "Quantity", "Unit"]])
 
-    # ---------- Tabella dei dati ----------
+    st.subheader("Tabella Completa")
     styled_df = df.style.applymap(highlight_status, subset=["Status"])
     st.dataframe(styled_df)
 
@@ -169,14 +170,12 @@ if items:
     status_counts = df["Status"].value_counts()
     st.write(status_counts)
 
-    # Mappatura personalizzata tra stati e colori
     status_colors = {
         "❌ Expired": "#ffcccc",
         "⚠️ Expiring Soon": "#fff2cc",
         "✅ OK": "#ccffcc"
     }
 
-    # Assicurati che l'ordine dei nomi corrisponda all'ordine dei colori
     ordered_names = status_counts.index.tolist()
     ordered_colors = [status_colors[name] for name in ordered_names]
 
@@ -188,7 +187,7 @@ if items:
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # ---------- Statistiche sullo spreco ----------
+    # ---------- Statistiche ----------
     st.subheader("📊 Statistiche sullo spreco")
 
     total_items, expired_items, ok_items = calculate_statistics(df)
@@ -198,7 +197,7 @@ if items:
     st.metric("Consumati (o OK)", ok_items)
 
     if expired_items > 0:
-        avg_price_per_item = 2.5  # Valore segnaposto
+        avg_price_per_item = 2.5
         lost_value = expired_items * avg_price_per_item
         st.write(f"💸 Perdita economica stimata: **€{lost_value:.2f}**")
 
