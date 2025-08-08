@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 import requests
 
-from db.database import initialize_db, insert_food_item, get_all_food_items
+from my_project.db.database import initialize_db, insert_food_item, get_all_food_items
+
+
 
 # --- FUNZIONI DI LOGICA ---
 
