@@ -1,23 +1,23 @@
-# app.py
-
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
-import matplotlib.pyplot as plt
+from datetime import datetime
 import plotly.express as px
 import requests
 
-from my_project.db.database import initialize_db, insert_food_item, get_all_food_items
+# Assicurati che questo import corrisponda alla struttura del tuo progetto
+from my_project.db.database import initialize_db, insert_food_item, get_all_food_items, delete_food_item
 
 # --- FUNZIONI DI LOGICA ---
 
 def calculate_statistics(df):
+    """Calcola le statistiche di base dal DataFrame."""
     total_items = len(df)
     expired_items = len(df[df['Status'] == '❌ Expired'])
     ok_items = len(df[df['Status'] == '✅ OK']) + len(df[df['Status'] == '⚠️ Expiring Soon'])
     return total_items, expired_items, ok_items
 
 def check_status(exp_date_str):
+    """Controlla lo stato di un articolo in base alla data di scadenza."""
     today = datetime.today().date()
     exp = datetime.strptime(exp_date_str, "%Y-%m-%d").date()
     if exp < today:
@@ -27,58 +27,65 @@ def check_status(exp_date_str):
     else:
         return "✅ OK"
 
-def highlight_status(val):
-    if val == "❌ Expired":
-        return 'background-color: #ffcccc'
-    elif val == "⚠️ Expiring Soon":
-        return 'background-color: #fff2cc'
-    elif val == "✅ OK":
-        return 'background-color: #ccffcc'
-    return ''
-
 # ----------------------------------------------------------------------------------
 
 # Inizializza il database
 initialize_db()
 
+# --- CONFIGURAZIONE DELLA PAGINA E STILE ---
 st.set_page_config(page_title="Food Waste Manager", layout="wide")
+
+# CSS per personalizzare l'aspetto dell'app
 st.markdown("""
     <style>
     .main {background-color: #f8f8f8; font-family: 'Arial';}
-    .stButton > button {
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        padding: 0.5em 1em;
+    .expired {
+        padding: 2px 5px;
+        background-color: #ffcccc;
+        color: #a60000;
+        border-radius: 5px;
+        font-weight: bold;
     }
-    .stDownloadButton > button {
-        background-color: #2196F3;
-        color: white;
-        border-radius: 6px;
-        padding: 0.5em 1em;
+    .soon {
+        padding: 2px 5px;
+        background-color: #fff2cc;
+        color: #ad8600;
+        border-radius: 5px;
+        font-weight: bold;
     }
-    .stMetricValue {
-        font-size: 26px;
-        color: #333;
-        font-weight: 600;
+    .ok {
+        padding: 2px 5px;
+        background-color: #ccffcc;
+        color: #006300;
+        border-radius: 5px;
+        font-weight: bold;
     }
-    .stDataFrame th {
-        background-color: #CED4E0;
+    /*
+    * NUOVO CODICE AGGIUNTO PER I BORDI DELLA TABELLA
+    */
+    .row-border {
+        border-bottom: 1px solid #ddd;
+        padding-top: 5px;
+        padding-bottom: 5px;
     }
-
-    /* Applica colore beige ai dataframe */
-    [data-testid="stDataFrame"] {
-        background-color: #f5f5dc !important;
-        padding: 20px;
-        border-radius: 10px;
+    .stContainer {
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        margin-bottom: 5px;
+        padding: 5px;
+    }
+    .stContainer.header {
+        background-color: #f0f0f0;
+        font-weight: bold;
+        border: none; /* Rimuovi il bordo per l'intestazione */
     }
     </style>
 """, unsafe_allow_html=True)
 
+
 st.title("🥦 Food Waste Manager")
 
-# ---------- Sidebar: aggiunta articolo ----------
+# ---------- SIDEBAR: AGGIUNTA ARTICOLO ----------
 with st.sidebar.form("add_food"):
     st.header("➕ Aggiungi un nuovo articolo")
 
@@ -87,22 +94,28 @@ with st.sidebar.form("add_food"):
     purchase_date = st.date_input("Data di Acquisto", datetime.today())
     expiration_date = st.date_input("Data di Scadenza")
     quantity = st.number_input("Quantità", min_value=0.0, step=0.1)
-    unit = st.text_input("Unità (es. kg, confezione, bottiglia)")
+    unit = st.text_input("Unit (es. kg, pz, lt)")
 
     submitted = st.form_submit_button("Aggiungi Articolo")
 
     if submitted and name:
         insert_food_item(name, category, purchase_date, expiration_date, quantity, unit)
-        st.success(f"'{name}' è stato aggiunto al tuo frigo! Aggiorna la pagina per vederlo.")
+        st.success(f"'{name}' è stato aggiunto al tuo frigo!")
+        st.rerun()
 
-# ---------- Visualizzazione articoli ----------
+# ---------- VISUALIZZAZIONE ARTICOLI ----------
 st.subheader("📋 Lista Cibo")
 
 items = get_all_food_items()
 
-if items:
-    df = pd.DataFrame(items, columns=["ID", "Name", "Category", "Purchase Date", "Expiration Date", "Quantity", "Unit"])
-    
+if not items:
+    st.info("Nessun articolo ancora. Usa la barra laterale per aggiungerne alcuni!")
+else:
+    df = pd.DataFrame(
+        items,
+        columns=["ID", "Name", "Category", "Purchase Date", "Expiration Date", "Quantity", "Unit"]
+    ).reset_index(drop=True)
+
     df["Status"] = df["Expiration Date"].apply(check_status)
 
     expiring_soon = df[df["Status"] == "⚠️ Expiring Soon"]
@@ -110,96 +123,85 @@ if items:
 
     if not expiring_soon.empty:
         st.warning("⚠️ I seguenti articoli stanno per scadere:")
-        st.dataframe(expiring_soon[["Name", "Expiration Date", "Quantity", "Unit"]])
+        st.dataframe(
+            expiring_soon[["Name", "Expiration Date", "Quantity", "Unit"]].reset_index(drop=True),
+            hide_index=True  # Nasconde l'indice numerico
+        )
 
     if not expired.empty:
         st.error("❌ I seguenti articoli sono scaduti:")
-        st.dataframe(expired[["Name", "Expiration Date", "Quantity", "Unit"]])
+        st.dataframe(
+            expired[["Name", "Expiration Date", "Quantity", "Unit"]].reset_index(drop=True),
+            hide_index=True  # Nasconde l'indice numerico
+        )
 
-    st.subheader("Tabella Completa")
-    styled_df = df.style.applymap(highlight_status, subset=["Status"])
-    st.dataframe(styled_df)
+    # ---------- TABELLA COMPLETA CON PULSANTI (METODO STREAMLIT) ----------
+    st.subheader("Tutti gli articoli in frigo")
 
-    # ---------- Suggerimenti per i pasti ----------
-    st.subheader("🍽️ Ispirazione per i pasti")
+    # 1. Creiamo un'intestazione per la nostra tabella con una classe CSS
+    col_header = st.columns([2, 2, 2, 2, 1, 1, 2, 1])
+    headers = ["Nome", "Categoria", "Acquisto", "Scadenza", "Quantità", "Unit", "Stato", "Azione"]
+    for col, header_text in zip(col_header, headers):
+        col.markdown(f"**{header_text}**")
 
-    if st.button("Cosa posso cucinare oggi?"):
-        ingredients = expiring_soon["Name"].tolist()
-
-        if ingredients:
-            spoonacular_key = "f05378d894eb4eb8b187551e2a492c49"
-            st.info("Ricerca di ricette per: " + ", ".join(ingredients))
-            query_ingredients = ",".join(ingredients)
-
-            url = f"https://api.spoonacular.com/recipes/findByIngredients?ingredients={query_ingredients}&number=1&ranking=1&apiKey={spoonacular_key}"
-
-            with st.spinner("Sto cercando una ricetta..."):
-                try:
-                    response = requests.get(url)
-                    recipes = response.json()
-
-                    if isinstance(recipes, list) and recipes:
-                        recipe = recipes[0]
-                        title = recipe["title"]
-                        image = recipe.get("image", "")
-                        recipe_id = recipe["id"]
-
-                        st.markdown(f"### 👨‍🍳 {title}")
-                        if image:
-                            st.image(image, width=400)
-
-                        instructions_url = f"https://api.spoonacular.com/recipes/{recipe_id}/analyzedInstructions?apiKey={spoonacular_key}"
-                        instructions_response = requests.get(instructions_url).json()
-
-                        if instructions_response and isinstance(instructions_response, list) and instructions_response[0].get("steps"):
-                            steps = instructions_response[0]["steps"]
-                            st.markdown("**Passaggi:**")
-                            for step in steps:
-                                st.markdown(f"**{step['number']}.** {step['step']}")
-                        else:
-                            st.info("Nessuna istruzione dettagliata disponibile.")
-                    else:
-                        st.warning("Nessuna ricetta trovata con questi ingredienti.")
-                except Exception as e:
-                    st.error(f"Errore durante la ricerca della ricetta: {e}")
-        else:
-            st.success("Nessun articolo in scadenza — niente di urgente da cucinare!")
-
-    # ---------- Grafico a torta ----------
-    st.subheader("🥧 Panoramica dello stato")
-    status_counts = df["Status"].value_counts()
-    st.write(status_counts)
-
-    status_colors = {
-        "❌ Expired": "#ffcccc",
-        "⚠️ Expiring Soon": "#fff2cc",
-        "✅ OK": "#ccffcc"
-    }
-
-    ordered_names = status_counts.index.tolist()
-    ordered_colors = [status_colors[name] for name in ordered_names]
-
-    fig = px.pie(
-        names=ordered_names,
-        values=status_counts.values,
-        title="Distribuzione dello stato del cibo",
-        color_discrete_sequence=ordered_colors
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-    # ---------- Statistiche ----------
-    st.subheader("📊 Statistiche sullo spreco")
-
-    total_items, expired_items, ok_items = calculate_statistics(df)
+    st.markdown("---")
     
-    st.metric("Articoli Totali", total_items)
-    st.metric("Articoli Scaduti", expired_items)
-    st.metric("Consumati (o OK)", ok_items)
+    # 2. Iteriamo su ogni riga del DataFrame per visualizzare i dati
+    for index, row in df.iterrows():
+        # Utilizza il parametro 'border=True' per mostrare un bordo per ogni riga
+        # Ho rimosso la classe 'stContainer' che ho aggiunto sopra, in modo da poter usare il parametro border
+        with st.container(border=True):
+            col_data = st.columns([2, 2, 2, 2, 1, 1, 2, 1])
+            
+            col_data[0].write(row['Name'])
+            col_data[1].write(row['Category'])
+            col_data[2].write(row['Purchase Date'])
+            col_data[3].write(row['Expiration Date'])
+            col_data[4].write(row['Quantity'])
+            col_data[5].write(row['Unit'])
+            
+            status_class = "ok" if "OK" in row["Status"] else "soon" if "Soon" in row["Status"] else "expired"
+            col_data[6].markdown(f"<div class='{status_class}'>{row['Status']}</div>", unsafe_allow_html=True)
+            
+            # 3. Creiamo il pulsante di eliminazione con una chiave unica
+            if col_data[7].button("🗑️", key=f"delete_{row['ID']}"):
+                delete_food_item(row["ID"])
+                st.success(f"'{row['Name']}' è stato eliminato!")
+                st.rerun()
 
-    if expired_items > 0:
-        avg_price_per_item = 2.5
-        lost_value = expired_items * avg_price_per_item
-        st.write(f"💸 Perdita economica stimata: **€{lost_value:.2f}**")
+    # ---------- GRAFICO A TORTA + STATISTICHE AFFIANCATI ----------
+    st.subheader("📈 Analisi generale")
+    col1, col2 = st.columns(2)
 
-else:
-    st.info("Nessun articolo ancora. Usa la barra laterale per aggiungerne alcuni!")
+    with col1:
+        st.subheader("🥧 Panoramica dello stato")
+        status_counts = df["Status"].value_counts()
+        
+        status_colors = {
+            "❌ Expired": "#ffcccc",
+            "⚠️ Expiring Soon": "#fff2cc",
+            "✅ OK": "#ccffcc"
+        }
+
+        fig = px.pie(
+            names=status_counts.index,
+            values=status_counts.values,
+            title="Distribuzione dello stato del cibo",
+            color=status_counts.index,
+            color_discrete_map=status_colors
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        st.subheader("📊 Statistiche sullo spreco")
+        total_items, expired_items, ok_items = calculate_statistics(df)
+        st.metric("Articoli Totali", total_items)
+        st.metric("Articoli Scaduti", expired_items)
+        st.metric("Articoli OK / In Scadenza", ok_items)
+
+        if expired_items > 0:
+            avg_price_per_item = 2.5  # Valore medio ipotetico per articolo
+            lost_value = expired_items * avg_price_per_item
+            st.warning(f"💸 Perdita economica stimata: **€{lost_value:.2f}**")
+        else:
+            st.info("No food items yet. Use the sidebar to add some!")
