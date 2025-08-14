@@ -47,3 +47,11 @@ def get_all_food_items():
     rows = c.fetchall()
     conn.close()
     return rows
+
+def delete_food_item(item_id):
+    conn = create_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM food_items WHERE id = ?", (item_id,))
+    conn.commit()
+    conn.close()
+
