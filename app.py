@@ -38,42 +38,42 @@ st.set_page_config(page_title="Food Waste Manager", layout="wide")
 st.markdown("""
     <style>
     .main {background-color: #f8f8f8; font-family: 'Arial';}
-    .expired {
-        padding: 2px 5px;
-        background-color: #ffcccc;
-        color: #a60000;
-        border-radius: 5px;
-        font-weight: bold;
-    }
-    .soon {
-        padding: 2px 5px;
-        background-color: #fff2cc;
-        color: #ad8600;
-        border-radius: 5px;
-        font-weight: bold;
-    }
-    .ok {
-        padding: 2px 5px;
+    .ok-box {
+        border: 1px solid #006300;
         background-color: #ccffcc;
-        color: #006300;
         border-radius: 5px;
-        font-weight: bold;
-    }
-    .row-border {
-        border-bottom: 1px solid #ddd;
-        padding-top: 5px;
-        padding-bottom: 5px;
-    }
-    .stContainer {
-        border: 1px solid #ddd;
-        border-radius: 5px;
+        padding: 10px;
         margin-bottom: 5px;
-        padding: 5px;
     }
-    .stContainer.header {
-        background-color: #f0f0f0;
+    .soon-box {
+        border: 1px solid #ad8600;
+        background-color: #fff2cc;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 5px;
+    }
+    .expired-box {
+        border: 1px solid #a60000;
+        background-color: #ffcccc;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 5px;
+    }
+    .status-badge {
+        padding: 2px 5px;
+        border-radius: 5px;
         font-weight: bold;
-        border: none;
+        text-align: center;
+        color: white;
+    }
+    .status-badge.ok {
+        background-color: #006300;
+    }
+    .status-badge.soon {
+        background-color: #ad8600;
+    }
+    .status-badge.expired {
+        background-color: #a60000;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -160,34 +160,62 @@ else:
         if col_b.button("❌ Cancel"):
             st.rerun()
 
-    # ---------- FULL ITEM TABLE WITH BUTTONS ----------
+    # --- DELETE ITEMS CONTAINERS (UPDATED SECTION) ---
     st.subheader("🗑️ Delete Items in the Fridge")
 
-    col_header = st.columns([2, 2, 2, 2, 1, 1, 2, 1])
-    headers = ["Name", "Category", "Purchase Date", "Expiration Date", "Quantity", "Unit", "Status", "Action"]
-    for col, header_text in zip(col_header, headers):
-        col.markdown(f"**{header_text}**")
+    items_to_display = filtered_df.iterrows()
+    
+    col1, col2 = st.columns(2)
 
-    st.markdown("---")
-    
-    for index, row in df.iterrows():
-        with st.container(border=True):
-            col_data = st.columns([2, 2, 2, 2, 1, 1, 2, 1])
+    for index, row in items_to_display:
+        status_class = "ok" if "✅ OK" in row["Status"] else "soon" if "⚠️ Expiring Soon" in row["Status"] else "expired"
+        box_class = f"{status_class}-box"
+
+        if index % 2 == 0:
+            with col1:
+                # Use a single markdown block for all item info
+                st.markdown(
+                    f"""
+                    <div class="{box_class}">
+                        <div style="display:flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight:bold;">{row['Name']}</span>
+                            <div class="status-badge {status_class}">{row['Status'].split(' ')[1]}</div>
+                        </div>
+                        <br>
+                        <strong>Category:</strong> {row['Category']}<br>
+                        <strong>Expiration Date:</strong> {row['Expiration Date']}<br>
+                        <strong>Quantity:</strong> {row['Quantity']} {row['Unit']}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+                
+                # Button is outside the colored box
+                if st.button("🗑️ Delete", key=f"del_{row['ID']}"):
+                    confirm_delete(row["ID"], row["Name"])
+
+        else:
+            with col2:
+                st.markdown(
+                    f"""
+                    <div class="{box_class}">
+                        <div style="display:flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight:bold;">{row['Name']}</span>
+                            <div class="status-badge {status_class}">{row['Status'].split(' ')[1]}</div>
+                        </div>
+                        <br>
+                         <strong>Category:</strong> {row['Category']}<br>
+                        <strong>Expiration Date:</strong> {row['Expiration Date']}<br>
+                        <strong>Quantity:</strong> {row['Quantity']} {row['Unit']}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+                
+                if st.button("🗑️ Delete", key=f"del_{row['ID']}"):
+                    confirm_delete(row["ID"], row["Name"])
             
-            col_data[0].write(row['Name'])
-            col_data[1].write(row['Category'])
-            col_data[2].write(row['Purchase Date'])
-            col_data[3].write(row['Expiration Date'])
-            col_data[4].write(row['Quantity'])
-            col_data[5].write(row['Unit'])
-            
-            status_class = "ok" if "OK" in row["Status"] else "soon" if "Soon" in row["Status"] else "expired"
-            col_data[6].markdown(f"<div class='{status_class}'>{row['Status']}</div>", unsafe_allow_html=True)
-            
-            if col_data[7].button("🗑️", key=f"del_filtered_{row['ID']}"):
-                confirm_delete(row["ID"], row["Name"])
-    
-     # ---------- "What Can I Cook Today?" BUTTON ----------
+    # ---------- "What Can I Cook Today?" BUTTON ----------
     st.subheader("🍽️ Meal Inspiration")
     expiring_soon = df[df["Status"] == "⚠️ Expiring Soon"]
 
@@ -269,5 +297,3 @@ else:
             st.warning(f"💸 Estimated Economic Loss: **€{lost_value:.2f}**")
         else:
             st.info("No food waste detected! Yey")
-
- 
