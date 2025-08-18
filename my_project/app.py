@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import plotly.express as px
+import requests
 
 # Ensure this import matches your project structure
 from my_project.db.database import initialize_db, insert_food_item, get_all_food_items, delete_food_item
@@ -175,6 +176,52 @@ else:
             
             if col_data[7].button("🗑️", key=f"del_filtered_{row['ID']}"):
                 confirm_delete(row["ID"], row["Name"])
+    
+     # ---------- "What Can I Cook Today?" BUTTON ----------
+    st.subheader("🍽️ Meal Inspiration")
+    expiring_soon = df[df["Status"] == "⚠️ Expiring Soon"]
+
+    if st.button("What Can I Cook Today?"):
+        ingredients = expiring_soon["Name"].tolist()
+
+        if ingredients:
+            spoonacular_key = "f05378d894eb4eb8b187551e2a492c49"
+            st.info("Searching recipes for: " + ", ".join(ingredients))
+            query_ingredients = ",".join(ingredients)
+
+            url = f"https://api.spoonacular.com/recipes/findByIngredients?ingredients={query_ingredients}&number=1&ranking=1&apiKey={spoonacular_key}"
+
+            with st.spinner("Finding recipe..."):
+                try:
+                    response = requests.get(url)
+                    recipes = response.json()
+
+                    if isinstance(recipes, list) and recipes:
+                        recipe = recipes[0]
+                        title = recipe["title"]
+                        image = recipe.get("image", "")
+                        recipe_id = recipe["id"]
+
+                        st.markdown(f"### 👨‍🍳 {title}")
+                        if image:
+                            st.image(image, width=400)
+
+                        instructions_url = f"https://api.spoonacular.com/recipes/{recipe_id}/analyzedInstructions?apiKey={spoonacular_key}"
+                        instructions_response = requests.get(instructions_url).json()
+
+                        if instructions_response and isinstance(instructions_response, list) and instructions_response[0].get("steps"):
+                            steps = instructions_response[0]["steps"]
+                            st.markdown("**Steps:**")
+                            for step in steps:
+                                st.markdown(f"**{step['number']}.** {step['step']}")
+                        else:
+                            st.info("No detailed instructions available.")
+                    else:
+                        st.warning("No recipes found with those ingredients.")
+                except Exception as e:
+                    st.error(f"Error fetching recipe: {e}")
+        else:
+            st.success("No items are expiring soon — nothing urgent to cook!")
    
     # ---------- PIE CHART + STATISTICS ----------
     st.subheader("📈 General Analysis")
@@ -212,3 +259,5 @@ else:
             st.warning(f"💸 Estimated Economic Loss: **€{lost_value:.2f}**")
         else:
             st.info("No food waste detected! Yey")
+
+ 
