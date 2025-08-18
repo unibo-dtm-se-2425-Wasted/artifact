@@ -44,54 +44,69 @@ st.set_page_config(page_title="Food Waste Manager", layout="wide")
 
 
 st.markdown("""
-    <style>
-    .main {background-color: #f8f8f8; font-family: 'Arial';}
-    .ok-box {
-        border: 1px solid #006300;
-        background-color: #ccffcc;
-        border-radius: 5px;
-        padding: 10px;
-        margin-bottom: 5px;
-    }
-    .soon-box {
-        border: 1px solid #ad8600;
-        background-color: #fff2cc;
-        border-radius: 5px;
-        padding: 10px;
-        margin-bottom: 5px;
-    }
-    .expired-box {
-        border: 1px solid #a60000;
-        background-color: #ffcccc;
-        border-radius: 5px;
-        padding: 10px;
-        margin-bottom: 5px;
-    }
-    .status-badge {
-        padding: 2px 5px;
-        border-radius: 5px;
-        font-weight: bold;
-        text-align: center;
-        color: white;
-    }
-    .status-badge.ok {
-        background-color: #006300;
-    }
-    .status-badge.soon {
-        background-color: #ad8600;
-    }
-    .status-badge.expired {
-        background-color: #a60000;
-    }
-            
-    .stats-box {
-        border: 2px solid #fffce4;
-        background-color: #fffce4;
-        border-radius: 5px;
-        padding: 15px;
-        margin-top: 15px;
+<style>
+/* -------------------- STATUS BOXES -------------------- */
+.ok-box {
+    border: 1px solid #2e6c46;
+    background-color: rgba(46, 108, 70, 0.2);
+    border-radius: 5px;
+    padding: 10px;
+    margin-bottom: 5px;
+    color: var(--text-color);
 }
-    </style>
+.soon-box {
+    border: 1px solid #ad8600;
+    background-color: rgba(173, 134, 0, 0.2);
+    border-radius: 5px;
+    padding: 10px;
+    margin-bottom: 5px;
+    color: var(--text-color);
+}
+.expired-box {
+    border: 1px solid #a60000;
+    background-color: rgba(166, 0, 0, 0.2);
+    border-radius: 5px;
+    padding: 10px;
+    margin-bottom: 5px;
+    color: var(--text-color);
+}
+
+/* -------------------- STATUS BADGES -------------------- */
+.status-badge {
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-weight: bold;
+    text-align: center;
+    color: white;
+}
+.status-badge.ok {
+    background-color: #2e6c46;
+}
+.status-badge.soon {
+    background-color: #ad8600;
+}
+.status-badge.expired {
+    background-color: #a60000;
+}
+
+/* -------------------- STATISTICS BOX -------------------- */
+/* light */
+.stats-box {
+    border: 2px solid #fffce4;
+    background-color: #fffce4;
+    border-radius: 5px;
+    padding: 15px;
+    margin-top: 15px;
+    color: #000000;
+}
+
+/* dark */
+html[data-theme="dark"] .stats-box {
+    border: 2px solid #faca2b;
+    background-color: #faca2b;
+    color: #000000;
+}
+</style>
 """, unsafe_allow_html=True)
 
 
