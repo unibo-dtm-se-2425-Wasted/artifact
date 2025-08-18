@@ -80,6 +80,13 @@ st.markdown("""
 
 st.title("🥦 Food Waste Manager")
 
+# ---------- POPUP SUCCESS DIALOG ----------
+@st.dialog("✅ Item Added")
+def success_popup(name):
+    st.success(f"'{name}' has been added to your fridge!")
+    if st.button("OK"):
+        st.rerun()
+
 # ---------- SIDEBAR: ADD ITEM ----------
 with st.sidebar.form("add_food"):
     st.header("➕ Add a new item")
@@ -95,13 +102,11 @@ with st.sidebar.form("add_food"):
 
     if submitted:
         if not name.strip():
-            # 🚨 Block insert and notify user
             st.toast("⚠️ Please write down your item before adding!", icon="⚠️")
         else:
-            # ✅ Add to database only if name is not empty
             insert_food_item(name, category, purchase_date, expiration_date, quantity, unit)
-            st.toast(f"✅ '{name}' has been added to your fridge!", icon="🎉")
-            st.rerun()
+            success_popup(name)  # 🔥 Popup in center
+
 
 # ---------- SIDEBAR: MULTI-SELECT FILTERS ----------
 with st.sidebar:

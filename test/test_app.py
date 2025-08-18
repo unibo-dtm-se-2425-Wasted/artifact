@@ -1,6 +1,6 @@
 import unittest
 import pandas as pd
-from my_project.app import calculate_statistics
+from app import calculate_statistics
 
 class TestAppLogic(unittest.TestCase):
     def test_calculate_statistics(self):
