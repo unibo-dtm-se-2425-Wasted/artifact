@@ -4,6 +4,14 @@ from datetime import datetime
 import plotly.express as px
 import requests
 
+import sys
+import os
+
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from db.database import initialize_db, insert_food_item, get_all_food_items, delete_food_item
+
 # Ensure this import matches your project structure
 from my_project.db.database import initialize_db, insert_food_item, get_all_food_items, delete_food_item
 

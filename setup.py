@@ -104,7 +104,7 @@ setup(
     ],
     keywords='aeuitas, horizon2020, xai, bias',  # Optional
     # package_dir={'': 'src'},  # Optional
-    packages=find_packages(),  # Required
+    packages=find_packages(include=['my_project', 'my_project.*']),  # Required
     include_package_data=True,
     python_requires=python_version,
     install_requires=dependencies,
