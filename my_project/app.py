@@ -84,7 +84,7 @@ with st.sidebar.form("add_food"):
     st.header("➕ Add a new item")
 
     name = st.text_input("Product Name")
-    category = st.selectbox("Category", ["Dairy", "Vegetables", "Meat", "Fruit", "Drinks", "Other"])
+    category = st.selectbox("Category", ["Dairy", "Vegetables", "Meat", "Fruit", "Drinks", "Fish", "Other"])
     purchase_date = st.date_input("Purchase Date", datetime.today())
     expiration_date = st.date_input("Expiration Date")
     quantity = st.number_input("Quantity", min_value=0.0, step=0.1)
