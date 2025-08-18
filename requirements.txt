@@ -1,6 +1,12 @@
-scikit-learn==1.4.1.post1
-pandas==2.2.1
-streamlit
-requests
-plotly
--e .
+# Data processing
+pandas>=2.2.1
+
+# Machine learning
+scikit-learn>=1.4
+
+# Visualization
+plotly>=5.20.0
+
+# Web / API
+requests>=2.31.0
+streamlit>=1.25.0
