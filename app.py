@@ -83,6 +83,14 @@ st.markdown("""
     .status-badge.expired {
         background-color: #a60000;
     }
+            
+    .stats-box {
+        border: 2px solid #fffce4;
+        background-color: #fffce4;
+        border-radius: 5px;
+        padding: 15px;
+        margin-top: 15px;
+}
     </style>
 """, unsafe_allow_html=True)
 
@@ -170,6 +178,7 @@ else:
             hide_index=True
         )
 
+    st.markdown("<hr>", unsafe_allow_html=True)
 
     # ---------- DELETE CONFIRMATION FUNCTION ----------
     @st.dialog("Confirm Deletion")
@@ -187,6 +196,7 @@ else:
     # --- DELETE ITEMS CONTAINERS (UPDATED SECTION) ---
     st.subheader("🗑️ Delete Items in the Fridge")
 
+    st.markdown("<br>", unsafe_allow_html=True)
 
     items_to_display = filtered_df.iterrows()
    
@@ -242,7 +252,8 @@ else:
                
                 if st.button("🗑️ Delete", key=f"del_{row['ID']}"):
                     confirm_delete(row["ID"], row["Name"])
-           
+    st.markdown("<hr>", unsafe_allow_html=True)
+       
     # ---------- "What Can I Cook Today?" BUTTON ----------
     st.subheader("🍽️ Meal Inspiration")
     expiring_soon = df[df["Status"] == "⚠️ Expiring Soon"]
@@ -296,13 +307,16 @@ else:
                     st.error(f"Error fetching recipe: {e}")
         else:
             st.success("No items are expiring soon — nothing urgent to cook!")
-   
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+
     # ---------- PIE CHART + STATISTICS ----------
     st.subheader("📈 General Analysis")
     col1, col2 = st.columns(2)
 
 
     with col1:
+        st.markdown("<br>", unsafe_allow_html=True)
         st.subheader("🥧 Status Overview")
         status_counts = df["Status"].value_counts()
        
@@ -324,16 +338,24 @@ else:
 
 
     with col2:
-        st.subheader("📊 Waste Statistics")
         total_items, expired_items, ok_items = calculate_statistics(df)
-        st.metric("Total Items", total_items)
-        st.metric("Expired Items", expired_items)
-        st.metric("OK / Expiring Soon Items", ok_items)
+        lost_value = expired_items * 2.5 if expired_items > 0 else 0
 
+        st.markdown(
+            f"""
+            <div class="stats-box">
+                <h3 style="margin-top:0;">📊 Waste Statistics</h3>
+                <br>
+                <strong>Total Items:</strong> {total_items}<br>
+                <strong>Expired Items:</strong> {expired_items}<br>
+                <strong>OK / Expiring Soon Items:</strong> {ok_items}
+                <br>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
         if expired_items > 0:
-            avg_price_per_item = 2.5
-            lost_value = expired_items * avg_price_per_item
             st.warning(f"💸 Estimated Economic Loss: **€{lost_value:.2f}**")
         else:
             st.info("No food waste detected! Yey")
