@@ -1,30 +1,14 @@
 import sqlite3
 import os
 import pandas as pd
-import uuid                # NEW
-import streamlit as st     # NEW
 
 
-# --- SESSIONE UTENTE --- #
-def get_session_id():       # NEW
-    """Crea o recupera un session_id unico per l'utente."""
-    if "session_id" not in st.session_state:
-        st.session_state["session_id"] = str(uuid.uuid4())
-    return st.session_state["session_id"]
+db_path = "data/food_items.db"
 
-
-def get_db_path():          # NEW
-    """Costruisce il percorso del DB per questa sessione utente."""
-    session_id = get_session_id()
-    # Ogni sessione ha il suo DB in /tmp (cartella temporanea Streamlit Cloud)
-    db_path = os.path.join("/tmp", f"food_items_{session_id}.db")
-    return db_path
-
-
-# --- DATABASE FUNCTIONS --- #
 def create_connection():
-    """Connessione al DB specifico per l’utente corrente."""
-    db_path = get_db_path()   # NEW
+    base_dir = os.path.dirname(os.path.abspath(__file__))  # this file's dir
+    db_path = os.path.join(base_dir, "data", "food_items.db")  # absolute path
+    print("Connecting to:", db_path)  # optional debug
     conn = sqlite3.connect(db_path)
     return conn
 
@@ -46,7 +30,6 @@ def initialize_db():
     conn.commit()
     conn.close()
 
-
 def insert_food_item(name, category, purchase_date, expiration_date, quantity, unit):
     conn = create_connection()
     c = conn.cursor()
@@ -57,7 +40,6 @@ def insert_food_item(name, category, purchase_date, expiration_date, quantity, u
     conn.commit()
     conn.close()
 
-
 def get_all_food_items():
     conn = create_connection()
     c = conn.cursor()
@@ -66,10 +48,10 @@ def get_all_food_items():
     conn.close()
     return rows
 
-
 def delete_food_item(item_id):
     conn = create_connection()
     c = conn.cursor()
     c.execute("DELETE FROM food_items WHERE id = ?", (item_id,))
     conn.commit()
     conn.close()
+
