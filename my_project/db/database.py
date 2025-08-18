@@ -1,9 +1,9 @@
+# database.py
+
 import sqlite3
 import os
-import pandas as pd
-import uuid                # NEW
-import streamlit as st     # NEW
-
+import uuid                # NEW: per generare session_id unici
+import streamlit as st     # NEW: per memorizzare session_id nello stato
 
 # --- SESSIONE UTENTE --- #
 def get_session_id():       # NEW
@@ -12,14 +12,11 @@ def get_session_id():       # NEW
         st.session_state["session_id"] = str(uuid.uuid4())
     return st.session_state["session_id"]
 
-
 def get_db_path():          # NEW
     """Costruisce il percorso del DB per questa sessione utente."""
     session_id = get_session_id()
-    # Ogni sessione ha il suo DB in /tmp (cartella temporanea Streamlit Cloud)
-    db_path = os.path.join("/tmp", f"food_items_{session_id}.db")
+    db_path = os.path.join("/tmp", f"food_items_{session_id}.db")  # NEW: DB temporaneo per sessione
     return db_path
-
 
 # --- DATABASE FUNCTIONS --- #
 def create_connection():
@@ -28,8 +25,8 @@ def create_connection():
     conn = sqlite3.connect(db_path)
     return conn
 
-
 def initialize_db():
+    """Crea la tabella food_items se non esiste."""
     conn = create_connection()
     c = conn.cursor()
     c.execute('''
@@ -46,8 +43,8 @@ def initialize_db():
     conn.commit()
     conn.close()
 
-
 def insert_food_item(name, category, purchase_date, expiration_date, quantity, unit):
+    """Inserisce un nuovo item nel DB della sessione."""
     conn = create_connection()
     c = conn.cursor()
     c.execute("""
@@ -57,8 +54,8 @@ def insert_food_item(name, category, purchase_date, expiration_date, quantity, u
     conn.commit()
     conn.close()
 
-
 def get_all_food_items():
+    """Restituisce tutti gli item dal DB della sessione."""
     conn = create_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM food_items")
@@ -66,8 +63,8 @@ def get_all_food_items():
     conn.close()
     return rows
 
-
 def delete_food_item(item_id):
+    """Elimina un item dal DB della sessione usando l'id."""
     conn = create_connection()
     c = conn.cursor()
     c.execute("DELETE FROM food_items WHERE id = ?", (item_id,))
