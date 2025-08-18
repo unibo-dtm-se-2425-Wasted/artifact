@@ -1,22 +1,41 @@
 import sqlite3
 import os
-import streamlit as st  # NEW
+import pandas as pd
+import uuid                # NEW
+import streamlit as st     # NEW
+
+
+
 
 # --- SESSIONE UTENTE --- #
-def get_user_db_path():  # NEW
-    """Ritorna il percorso del DB specifico per l'utente."""
-    if "user_id" not in st.session_state:
-        import uuid
-        st.session_state["user_id"] = str(uuid.uuid4())  # NEW
-    user_id = st.session_state["user_id"]
-    db_path = os.path.join("/tmp", f"food_items_{user_id}.db")  # NEW
+def get_session_id():       # NEW
+    """Crea o recupera un session_id unico per l'utente."""
+    if "session_id" not in st.session_state:
+        st.session_state["session_id"] = str(uuid.uuid4())
+    return st.session_state["session_id"]
+
+
+
+
+def get_db_path():          # NEW
+    """Costruisce il percorso del DB per questa sessione utente."""
+    session_id = get_session_id()
+    # Ogni sessione ha il suo DB in /tmp (cartella temporanea Streamlit Cloud)
+    db_path = os.path.join("/tmp", f"food_items_{session_id}.db")
     return db_path
+
+
+
 
 # --- DATABASE FUNCTIONS --- #
 def create_connection():
-    db_path = get_user_db_path()  # NEW
+    """Connessione al DB specifico per l’utente corrente."""
+    db_path = get_db_path()   # NEW
     conn = sqlite3.connect(db_path)
     return conn
+
+
+
 
 def initialize_db():
     conn = create_connection()
@@ -35,6 +54,9 @@ def initialize_db():
     conn.commit()
     conn.close()
 
+
+
+
 def insert_food_item(name, category, purchase_date, expiration_date, quantity, unit):
     conn = create_connection()
     c = conn.cursor()
@@ -45,6 +67,9 @@ def insert_food_item(name, category, purchase_date, expiration_date, quantity, u
     conn.commit()
     conn.close()
 
+
+
+
 def get_all_food_items():
     conn = create_connection()
     c = conn.cursor()
@@ -53,9 +78,14 @@ def get_all_food_items():
     conn.close()
     return rows
 
+
+
+
 def delete_food_item(item_id):
     conn = create_connection()
     c = conn.cursor()
     c.execute("DELETE FROM food_items WHERE id = ?", (item_id,))
     conn.commit()
     conn.close()
+
+
