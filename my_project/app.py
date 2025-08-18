@@ -156,7 +156,7 @@ else:
             st.rerun()
 
     # ---------- FULL ITEM TABLE WITH BUTTONS ----------
-    st.subheader("All Items in the Fridge")
+    st.subheader("🗑️ Delete Items in the Fridge")
 
     col_header = st.columns([2, 2, 2, 2, 1, 1, 2, 1])
     headers = ["Name", "Category", "Purchase Date", "Expiration Date", "Quantity", "Unit", "Status", "Action"]
@@ -166,7 +166,7 @@ else:
     st.markdown("---")
     
     for index, row in df.iterrows():
-        with st.container(border=False):
+        with st.container(border=True):
             col_data = st.columns([2, 2, 2, 2, 1, 1, 2, 1])
             
             col_data[0].write(row['Name'])
