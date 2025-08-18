@@ -92,10 +92,15 @@ with st.sidebar.form("add_food"):
 
     submitted = st.form_submit_button("Add Item")
 
-    if submitted and name:
-        insert_food_item(name, category, purchase_date, expiration_date, quantity, unit)
-        st.success(f"'{name}' has been added to your fridge!")
-        st.rerun()
+    if submitted:
+        if not name.strip():
+            # 🚨 Block insert and notify user
+            st.toast("⚠️ Please write down your item before adding!", icon="⚠️")
+        else:
+            # ✅ Add to database only if name is not empty
+            insert_food_item(name, category, purchase_date, expiration_date, quantity, unit)
+            st.toast(f"✅ '{name}' has been added to your fridge!", icon="🎉")
+            st.rerun()
 
 # ---------- SIDEBAR: MULTI-SELECT FILTERS ----------
 with st.sidebar:
@@ -160,7 +165,7 @@ else:
     st.markdown("---")
     
     for index, row in df.iterrows():
-        with st.container(border=True):
+        with st.container(border=False):
             col_data = st.columns([2, 2, 2, 2, 1, 1, 2, 1])
             
             col_data[0].write(row['Name'])
