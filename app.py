@@ -78,7 +78,8 @@ with st.sidebar:
 # ---------- DISPLAY ITEMS ---------- #
 st.subheader("📋 Food List")
 
-items = get_all_food_items(st.session_state["user_id"])   # NEW pass user_id
+items = get_all_food_items() 
+
 
 if not items:
     st.info("No items yet. Use the sidebar to add some!")
