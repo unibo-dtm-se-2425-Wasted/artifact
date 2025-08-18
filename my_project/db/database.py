@@ -13,8 +13,6 @@ def create_connection():
     return conn
 
 
-
-
 def initialize_db():
     conn = create_connection()
     c = conn.cursor()
@@ -32,7 +30,6 @@ def initialize_db():
     conn.commit()
     conn.close()
 
-
 def insert_food_item(name, category, purchase_date, expiration_date, quantity, unit):
     conn = create_connection()
     c = conn.cursor()
@@ -43,7 +40,6 @@ def insert_food_item(name, category, purchase_date, expiration_date, quantity, u
     conn.commit()
     conn.close()
 
-
 def get_all_food_items():
     conn = create_connection()
     c = conn.cursor()
@@ -51,7 +47,6 @@ def get_all_food_items():
     rows = c.fetchall()
     conn.close()
     return rows
-
 
 def delete_food_item(item_id):
     conn = create_connection()
