@@ -12,19 +12,17 @@ from my_project.db.database import (
     initialize_db
 )
 
-# ---------------------- INITIALIZE ----------------------
+# ---------------------- INIT ----------------------
 initialize_db()
+st.set_page_config(page_title="Food Waste Manager", layout="wide")
 
 # ---------------------- SESSION STATE ----------------------
 if "user_id" not in st.session_state:
     st.session_state.user_id = None
-
+if "login_success" not in st.session_state:
+    st.session_state.login_success = False
 if "rerun_flag" not in st.session_state:
     st.session_state.rerun_flag = False
-
-if st.session_state.rerun_flag:
-    st.session_state.rerun_flag = False
-    st.experimental_rerun()
 
 # ---------------------- UTILITY ----------------------
 def check_status(exp_date_str):
@@ -44,9 +42,6 @@ def calculate_statistics(df):
     lost_value = expired_items * 2.5
     return total_items, expired_items, ok_items, lost_value
 
-# ---------------------- APP CONFIG ----------------------
-st.set_page_config(page_title="Food Waste Manager", layout="wide")
-
 # ---------------------- LOGIN / REGISTER ----------------------
 if st.session_state.user_id is None:
     tab1, tab2 = st.tabs(["Login", "Register"])
@@ -59,6 +54,7 @@ if st.session_state.user_id is None:
             user_id = login_user(username, password)
             if user_id:
                 st.session_state.user_id = user_id
+                st.success(f"Welcome back, {username}!")
                 st.session_state.rerun_flag = True
             else:
                 st.error("Invalid username or password")
@@ -73,6 +69,11 @@ if st.session_state.user_id is None:
                 st.success("User registered! You can now login.")
             else:
                 st.error("Username already exists")
+
+    # Gestione rerun dopo login
+    if st.session_state.rerun_flag:
+        st.session_state.rerun_flag = False
+        st.experimental_rerun()
 
 # ---------------------- MAIN APP ----------------------
 else:
@@ -94,14 +95,21 @@ else:
             if not name.strip():
                 st.warning("⚠️ Please write down your item before adding!")
             else:
-                insert_food_item(user_id, name, category, purchase_date.strftime("%Y-%m-%d"),
-                                 expiration_date.strftime("%Y-%m-%d"), quantity, unit)
+                insert_food_item(
+                    user_id,
+                    name,
+                    category,
+                    purchase_date.strftime("%Y-%m-%d"),
+                    expiration_date.strftime("%Y-%m-%d"),
+                    quantity,
+                    unit
+                )
                 st.success(f"'{name}' has been added to your fridge!")
-                st.session_state.rerun_flag = True
+                st.experimental_rerun()  # OK perché dentro un evento form
 
     # --- GET ITEMS ---
     items = get_all_food_items(user_id)
-
+    
     if not items:
         st.info("No items yet. Use the sidebar to add some!")
     else:
@@ -117,19 +125,18 @@ else:
 
         # --- DISPLAY ---
         st.subheader("📋 Food List")
-        st.dataframe(filtered_df[["Name", "Category", "Expiration Date", "Quantity", "Unit", "Status"]],
-                     hide_index=True)
+        st.dataframe(filtered_df[["Name", "Category", "Expiration Date", "Quantity", "Unit", "Status"]], hide_index=True)
 
         # --- DELETE ITEMS ---
         st.subheader("🗑️ Delete Items")
         for _, row in filtered_df.iterrows():
-            col1, col2 = st.columns([4, 1])
+            col1, col2 = st.columns([4,1])
             with col1:
                 st.write(f"{row['Name']} ({row['Quantity']} {row['Unit']}) - {row['Status']}")
             with col2:
                 if st.button("🗑️ Delete", key=f"del_{row['ID']}"):
                     delete_food_item(user_id, row["ID"])
-                    st.session_state.rerun_flag = True
+                    st.experimental_rerun()  # OK perché dentro click
 
         # --- COOK TODAY ---
         st.subheader("🍽️ Meal Inspiration")
@@ -145,7 +152,7 @@ else:
                         if recipes:
                             recipe = recipes[0]
                             st.markdown(f"### 👨‍🍳 {recipe['title']}")
-                            st.image(recipe.get("image", ""), width=400)
+                            st.image(recipe.get("image",""), width=400)
                             steps_url = f"https://api.spoonacular.com/recipes/{recipe['id']}/analyzedInstructions?apiKey={spoonacular_key}"
                             steps_resp = requests.get(steps_url).json()
                             if steps_resp and steps_resp[0].get("steps"):
@@ -170,7 +177,7 @@ else:
                 names=status_counts.index,
                 values=status_counts.values,
                 color=status_counts.index,
-                color_discrete_map={"❌ Expired": "#ffcccc", "⚠️ Expiring Soon": "#fff2cc", "✅ OK": "#ccffcc"}
+                color_discrete_map={"❌ Expired":"#ffcccc","⚠️ Expiring Soon":"#fff2cc","✅ OK":"#ccffcc"}
             )
             st.plotly_chart(fig, use_container_width=True)
         with col2:
