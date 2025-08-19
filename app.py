@@ -3,8 +3,16 @@ import pandas as pd
 from datetime import datetime
 import plotly.express as px
 import requests
-from my_project.db.database import login_user, register_user, insert_food_item, get_all_food_items, delete_food_item, initialize_db
+from my_project.db.database import (
+    login_user,
+    register_user,
+    insert_food_item,
+    get_all_food_items,
+    delete_food_item,
+    initialize_db
+)
 initialize_db()
+
 
 # ---------------------- UTILITY ----------------------
 def check_status(exp_date_str):
