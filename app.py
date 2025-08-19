@@ -12,7 +12,7 @@ from my_project.db.database import (
     initialize_db
 )
 
-# Inizializza DB
+# ---------------------- INIT ----------------------
 initialize_db()
 
 # ---------------------- UTILITY ----------------------
@@ -33,12 +33,19 @@ def calculate_statistics(df):
     lost_value = expired_items * 2.5
     return total_items, expired_items, ok_items, lost_value
 
-# ---------------------- APP ----------------------
-st.set_page_config(page_title="Food Waste Manager", layout="wide")
-
-# Stato utente
+# ---------------------- SESSION STATE ----------------------
 if "user_id" not in st.session_state:
     st.session_state.user_id = None
+if "rerun_flag" not in st.session_state:
+    st.session_state.rerun_flag = False
+
+# Gestione rerun sicuro
+if st.session_state.rerun_flag:
+    st.session_state.rerun_flag = False
+    st.experimental_rerun()
+
+# ---------------------- APP ----------------------
+st.set_page_config(page_title="Food Waste Manager", layout="wide")
 
 # --- LOGIN / REGISTER ---
 if st.session_state.user_id is None:
@@ -53,7 +60,7 @@ if st.session_state.user_id is None:
             if user_id:
                 st.session_state.user_id = user_id
                 st.success(f"Welcome back, {username}!")
-                st.experimental_rerun()
+                st.session_state.rerun_flag = True
             else:
                 st.error("Invalid username or password")
     
@@ -91,7 +98,7 @@ else:
                 insert_food_item(user_id, name, category, purchase_date.strftime("%Y-%m-%d"),
                                  expiration_date.strftime("%Y-%m-%d"), quantity, unit)
                 st.success(f"'{name}' has been added to your fridge!")
-                st.experimental_rerun()  # <-- sicuro, perché dentro un form submit
+                st.session_state.rerun_flag = True
 
     # --- GET ITEMS ---
     items = get_all_food_items(user_id)
@@ -99,7 +106,7 @@ else:
     if not items:
         st.info("No items yet. Use the sidebar to add some!")
     else:
-        df = pd.DataFrame(items, columns=["ID", "User_ID", "Name", "Category", "Purchase Date",
+        df = pd.DataFrame(items, columns=["ID", "Name", "Category", "Purchase Date",
                                           "Expiration Date", "Quantity", "Unit"])
         df["Status"] = df["Expiration Date"].apply(check_status)
         
@@ -121,8 +128,8 @@ else:
                 st.write(f"{row['Name']} ({row['Quantity']} {row['Unit']}) - {row['Status']}")
             with col2:
                 if st.button("🗑️ Delete", key=f"del_{row['ID']}"):
-                    delete_food_item(user_id, row["ID"])
-                    st.experimental_rerun()  # <-- sicuro, dentro bottone
+                    delete_food_item(st.session_state.user_id, row["ID"])
+                    st.session_state.rerun_flag = True
 
         # --- COOK TODAY ---
         st.subheader("🍽️ Meal Inspiration")
