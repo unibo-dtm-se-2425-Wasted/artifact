@@ -12,17 +12,8 @@ from my_project.db.database import (
     initialize_db
 )
 
-# ---------------------- INIT ----------------------
+# ---------------------- INITIALIZE DB ----------------------
 initialize_db()
-st.set_page_config(page_title="Food Waste Manager", layout="wide")
-
-# ---------------------- SESSION STATE ----------------------
-if "user_id" not in st.session_state:
-    st.session_state.user_id = None
-if "login_success" not in st.session_state:
-    st.session_state.login_success = False
-if "rerun_flag" not in st.session_state:
-    st.session_state.rerun_flag = False
 
 # ---------------------- UTILITY ----------------------
 def check_status(exp_date_str):
@@ -42,43 +33,50 @@ def calculate_statistics(df):
     lost_value = expired_items * 2.5
     return total_items, expired_items, ok_items, lost_value
 
-# ---------------------- LOGIN / REGISTER ----------------------
+# ---------------------- SESSION STATE ----------------------
+if "user_id" not in st.session_state:
+    st.session_state.user_id = None
+if "username" not in st.session_state:
+    st.session_state.username = None
+if "items" not in st.session_state:
+    st.session_state.items = []
+
+# ---------------------- APP LAYOUT ----------------------
+st.set_page_config(page_title="Food Waste Manager", layout="wide")
+
+# --- LOGIN / REGISTER ---
 if st.session_state.user_id is None:
     tab1, tab2 = st.tabs(["Login", "Register"])
-
+    
     with tab1:
         st.subheader("🔑 Login")
-        username = st.text_input("Username", key="login_user")
-        password = st.text_input("Password", type="password", key="login_pass")
+        username_input = st.text_input("Username", key="login_user")
+        password_input = st.text_input("Password", type="password", key="login_pass")
         if st.button("Login"):
-            user_id = login_user(username, password)
+            user_id = login_user(username_input, password_input)
             if user_id:
                 st.session_state.user_id = user_id
-                st.success(f"Welcome back, {username}!")
-                st.session_state.rerun_flag = True
+                st.session_state.username = username_input
+                st.success(f"Welcome back, {username_input}!")
+                st.session_state.items = get_all_food_items(user_id)
             else:
                 st.error("Invalid username or password")
-
+    
     with tab2:
         st.subheader("📝 Register")
-        new_username = st.text_input("Username", key="reg_user")
-        new_password = st.text_input("Password", type="password", key="reg_pass")
+        reg_username = st.text_input("Username", key="reg_user")
+        reg_password = st.text_input("Password", type="password", key="reg_pass")
         if st.button("Register"):
-            success = register_user(new_username, new_password)
+            success = register_user(reg_username, reg_password)
             if success:
                 st.success("User registered! You can now login.")
             else:
                 st.error("Username already exists")
 
-    # Gestione rerun dopo login
-    if st.session_state.rerun_flag:
-        st.session_state.rerun_flag = False
-        st.experimental_rerun()
-
-# ---------------------- MAIN APP ----------------------
+# --- MAIN APP ---
 else:
     user_id = st.session_state.user_id
-    st.title("🥦 Food Waste Manager")
+    st.title(f"🥦 Food Waste Manager - {st.session_state.username}")
 
     # --- ADD ITEM SIDEBAR ---
     with st.sidebar.form("add_food"):
@@ -95,38 +93,31 @@ else:
             if not name.strip():
                 st.warning("⚠️ Please write down your item before adding!")
             else:
-                insert_food_item(
-                    user_id,
-                    name,
-                    category,
-                    purchase_date.strftime("%Y-%m-%d"),
-                    expiration_date.strftime("%Y-%m-%d"),
-                    quantity,
-                    unit
-                )
+                insert_food_item(user_id, name, category, purchase_date.strftime("%Y-%m-%d"),
+                                 expiration_date.strftime("%Y-%m-%d"), quantity, unit)
                 st.success(f"'{name}' has been added to your fridge!")
-                st.experimental_rerun()  # OK perché dentro un evento form
+                # Aggiorna lista items senza rerun
+                st.session_state.items = get_all_food_items(user_id)
 
-    # --- GET ITEMS ---
-    items = get_all_food_items(user_id)
-    
+    # --- DISPLAY ITEMS ---
+    items = st.session_state.items
     if not items:
         st.info("No items yet. Use the sidebar to add some!")
     else:
-        df = pd.DataFrame(items, columns=["ID", "User ID", "Name", "Category", "Purchase Date",
+        df = pd.DataFrame(items, columns=["ID", "Name", "Category", "Purchase Date",
                                           "Expiration Date", "Quantity", "Unit"])
         df["Status"] = df["Expiration Date"].apply(check_status)
-
+        
         # --- FILTER ---
         st.sidebar.header("🔍 Filter Items")
         status_options = ["✅ OK", "⚠️ Expiring Soon", "❌ Expired"]
         selected_status = st.sidebar.multiselect("Select statuses", status_options, default=[])
         filtered_df = df[df["Status"].isin(selected_status)] if selected_status else df
 
-        # --- DISPLAY ---
+        # --- DISPLAY TABLE ---
         st.subheader("📋 Food List")
         st.dataframe(filtered_df[["Name", "Category", "Expiration Date", "Quantity", "Unit", "Status"]], hide_index=True)
-
+        
         # --- DELETE ITEMS ---
         st.subheader("🗑️ Delete Items")
         for _, row in filtered_df.iterrows():
@@ -136,7 +127,7 @@ else:
             with col2:
                 if st.button("🗑️ Delete", key=f"del_{row['ID']}"):
                     delete_food_item(user_id, row["ID"])
-                    st.experimental_rerun()  # OK perché dentro click
+                    st.session_state.items = get_all_food_items(user_id)  # aggiorna lista
 
         # --- COOK TODAY ---
         st.subheader("🍽️ Meal Inspiration")
