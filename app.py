@@ -12,7 +12,7 @@ from my_project.db.database import (
     initialize_db
 )
 
-# --- Initialize DB & create test user ---
+# Inizializza DB
 initialize_db()
 
 # ---------------------- UTILITY ----------------------
@@ -36,13 +36,14 @@ def calculate_statistics(df):
 # ---------------------- APP ----------------------
 st.set_page_config(page_title="Food Waste Manager", layout="wide")
 
+# Stato utente
 if "user_id" not in st.session_state:
     st.session_state.user_id = None
 
 # --- LOGIN / REGISTER ---
 if st.session_state.user_id is None:
     tab1, tab2 = st.tabs(["Login", "Register"])
-
+    
     with tab1:
         st.subheader("🔑 Login")
         username = st.text_input("Username", key="login_user")
@@ -55,7 +56,7 @@ if st.session_state.user_id is None:
                 st.experimental_rerun()
             else:
                 st.error("Invalid username or password")
-
+    
     with tab2:
         st.subheader("📝 Register")
         new_username = st.text_input("Username", key="reg_user")
@@ -71,7 +72,7 @@ if st.session_state.user_id is None:
 else:
     user_id = st.session_state.user_id
     st.title("🥦 Food Waste Manager")
-
+    
     # --- ADD ITEM SIDEBAR ---
     with st.sidebar.form("add_food"):
         st.header("➕ Add a new item")
@@ -90,18 +91,18 @@ else:
                 insert_food_item(user_id, name, category, purchase_date.strftime("%Y-%m-%d"),
                                  expiration_date.strftime("%Y-%m-%d"), quantity, unit)
                 st.success(f"'{name}' has been added to your fridge!")
-                st.experimental_rerun()
+                st.experimental_rerun()  # <-- sicuro, perché dentro un form submit
 
     # --- GET ITEMS ---
     items = get_all_food_items(user_id)
-
+    
     if not items:
         st.info("No items yet. Use the sidebar to add some!")
     else:
-        df = pd.DataFrame(items, columns=["ID", "Name", "Category", "Purchase Date",
+        df = pd.DataFrame(items, columns=["ID", "User_ID", "Name", "Category", "Purchase Date",
                                           "Expiration Date", "Quantity", "Unit"])
         df["Status"] = df["Expiration Date"].apply(check_status)
-
+        
         # --- FILTER ---
         st.sidebar.header("🔍 Filter Items")
         status_options = ["✅ OK", "⚠️ Expiring Soon", "❌ Expired"]
@@ -111,7 +112,7 @@ else:
         # --- DISPLAY ---
         st.subheader("📋 Food List")
         st.dataframe(filtered_df[["Name", "Category", "Expiration Date", "Quantity", "Unit", "Status"]], hide_index=True)
-
+        
         # --- DELETE ITEMS ---
         st.subheader("🗑️ Delete Items")
         for _, row in filtered_df.iterrows():
@@ -121,7 +122,7 @@ else:
             with col2:
                 if st.button("🗑️ Delete", key=f"del_{row['ID']}"):
                     delete_food_item(user_id, row["ID"])
-                    st.experimental_rerun()
+                    st.experimental_rerun()  # <-- sicuro, dentro bottone
 
         # --- COOK TODAY ---
         st.subheader("🍽️ Meal Inspiration")
