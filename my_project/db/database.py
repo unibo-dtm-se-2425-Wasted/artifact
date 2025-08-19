@@ -8,7 +8,7 @@ def create_connection():
     data_dir = os.path.join(base_dir, "data")
     os.makedirs(data_dir, exist_ok=True)
     db_path = os.path.join(data_dir, "food_items.db")
-    conn = sqlite3.connect(db_path, check_same_thread=False)
+    conn = sqlite3.connect(db_path)
     return conn
 
 # ---------------------- INIT DB ----------------------
@@ -81,20 +81,16 @@ def login_user(username, password):
 
 # ---------------------- FOOD ITEM FUNCTIONS ----------------------
 def insert_food_item(user_id, name, category, purchase_date, expiration_date, quantity, unit):
-    if user_id is None:
-        return
     conn = create_connection()
     c = conn.cursor()
     c.execute("""
         INSERT INTO food_items (user_id, name, category, purchase_date, expiration_date, quantity, unit)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (user_id, name, category, str(purchase_date), str(expiration_date), quantity, unit))
+    """, (user_id, name, category, purchase_date, expiration_date, quantity, unit))
     conn.commit()
     conn.close()
 
 def get_all_food_items(user_id):
-    if user_id is None:
-        return []
     conn = create_connection()
     c = conn.cursor()
     c.execute("""
@@ -118,8 +114,6 @@ def get_all_food_items(user_id):
     return items
 
 def delete_food_item(user_id, item_id):
-    if user_id is None:
-        return
     conn = create_connection()
     c = conn.cursor()
     c.execute("DELETE FROM food_items WHERE user_id = ? AND id = ?", (user_id, item_id))
