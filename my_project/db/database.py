@@ -43,6 +43,19 @@ def initialize_db():
     conn.commit()
     conn.close()
 
+    real_username = "prova"
+    real_password = "1234"
+    c.execute("SELECT * FROM users WHERE username = ?", (real_username,))
+    if not c.fetchone():
+        import hashlib
+        password_hash = hashlib.sha256(real_password.encode()).hexdigest()
+        c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", 
+                  (real_username, password_hash))
+        print(f"Utente reale creato: {real_username} / {real_password}")
+
+    conn.commit()
+    conn.close()
+
 # ---------------------- FOOD ITEM FUNCTIONS ----------------------
 def insert_food_item(user_id, name, category, purchase_date, expiration_date, quantity, unit):
     conn = create_connection()
