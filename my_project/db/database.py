@@ -15,8 +15,8 @@ def create_connection():
 def initialize_db():
     conn = create_connection()
     c = conn.cursor()
-    
-    # Users table
+
+    # Creazione tabella users
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,8 +24,8 @@ def initialize_db():
             password_hash TEXT NOT NULL
         )
     ''')
-    
-    # Food items table
+
+    # Creazione tabella food_items
     c.execute('''
         CREATE TABLE IF NOT EXISTS food_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,19 +39,16 @@ def initialize_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     ''')
-    
-    conn.commit()
-    conn.close()
 
+    # Inserimento utente di prova se non esiste
     real_username = "prova"
     real_password = "1234"
-    c.execute("SELECT * FROM users WHERE username = ?", (real_username,))
-    if not c.fetchone():
-        import hashlib
-        password_hash = hashlib.sha256(real_password.encode()).hexdigest()
-        c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", 
+    password_hash = hashlib.sha256(real_password.encode()).hexdigest()
+    c.execute("SELECT id FROM users WHERE username = ?", (real_username,))
+    if c.fetchone() is None:
+        c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)",
                   (real_username, password_hash))
-        print(f"Utente reale creato: {real_username} / {real_password}")
+        print(f"Utente di prova creato: {real_username} / {real_password}")
 
     conn.commit()
     conn.close()
