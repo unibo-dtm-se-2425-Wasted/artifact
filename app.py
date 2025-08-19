@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import plotly.express as px
-import requests
 from my_project.db.database import (
     login_user,
     register_user,
@@ -12,8 +11,15 @@ from my_project.db.database import (
     initialize_db
 )
 
-# ---------------------- INITIALIZE DB ----------------------
+# ---------------------- INIT ----------------------
 initialize_db()
+st.set_page_config(page_title="Food Waste Manager", layout="wide")
+
+# ---------------------- SESSION STATE ----------------------
+if "user_id" not in st.session_state:
+    st.session_state.user_id = None
+if "items" not in st.session_state:
+    st.session_state.items = []
 
 # ---------------------- UTILITY ----------------------
 def check_status(exp_date_str):
@@ -26,57 +32,51 @@ def check_status(exp_date_str):
     else:
         return "✅ OK"
 
+def refresh_items():
+    if st.session_state.user_id:
+        st.session_state.items = get_all_food_items(st.session_state.user_id)
+        for item in st.session_state.items:
+            item["Status"] = check_status(item["Expiration Date"])
+
 def calculate_statistics(df):
     total_items = len(df)
     expired_items = len(df[df['Status'] == '❌ Expired'])
-    ok_items = len(df[df['Status'] == '✅ OK']) + len(df[df['Status'] == '⚠️ Expiring Soon'])
+    ok_items = len(df[df['Status'].isin(['✅ OK', '⚠️ Expiring Soon'])])
     lost_value = expired_items * 2.5
     return total_items, expired_items, ok_items, lost_value
 
-# ---------------------- SESSION STATE ----------------------
-if "user_id" not in st.session_state:
-    st.session_state.user_id = None
-if "username" not in st.session_state:
-    st.session_state.username = None
-if "items" not in st.session_state:
-    st.session_state.items = []
-
-# ---------------------- APP LAYOUT ----------------------
-st.set_page_config(page_title="Food Waste Manager", layout="wide")
-
-# --- LOGIN / REGISTER ---
+# ---------------------- AUTH ----------------------
 if st.session_state.user_id is None:
     tab1, tab2 = st.tabs(["Login", "Register"])
-    
+
     with tab1:
         st.subheader("🔑 Login")
-        username_input = st.text_input("Username", key="login_user")
-        password_input = st.text_input("Password", type="password", key="login_pass")
+        username = st.text_input("Username", key="login_user")
+        password = st.text_input("Password", type="password", key="login_pass")
         if st.button("Login"):
-            user_id = login_user(username_input, password_input)
+            user_id = login_user(username, password)
             if user_id:
                 st.session_state.user_id = user_id
-                st.session_state.username = username_input
-                st.success(f"Welcome back, {username_input}!")
-                st.session_state.items = get_all_food_items(user_id)
+                refresh_items()
+                st.success(f"Welcome back, {username}!")
             else:
                 st.error("Invalid username or password")
-    
+
     with tab2:
         st.subheader("📝 Register")
-        reg_username = st.text_input("Username", key="reg_user")
-        reg_password = st.text_input("Password", type="password", key="reg_pass")
+        new_username = st.text_input("Username", key="reg_user")
+        new_password = st.text_input("Password", type="password", key="reg_pass")
         if st.button("Register"):
-            success = register_user(reg_username, reg_password)
+            success = register_user(new_username, new_password)
             if success:
                 st.success("User registered! You can now login.")
             else:
                 st.error("Username already exists")
 
-# --- MAIN APP ---
+# ---------------------- APP ----------------------
 else:
     user_id = st.session_state.user_id
-    st.title(f"🥦 Food Waste Manager - {st.session_state.username}")
+    st.title("🥦 Food Waste Manager")
 
     # --- ADD ITEM SIDEBAR ---
     with st.sidebar.form("add_food"):
@@ -95,69 +95,44 @@ else:
             else:
                 insert_food_item(user_id, name, category, purchase_date.strftime("%Y-%m-%d"),
                                  expiration_date.strftime("%Y-%m-%d"), quantity, unit)
+                refresh_items()
                 st.success(f"'{name}' has been added to your fridge!")
-                # Aggiorna lista items senza rerun
-                st.session_state.items = get_all_food_items(user_id)
 
-    # --- DISPLAY ITEMS ---
+    # --- REFRESH ITEMS ---
+    refresh_items()
     items = st.session_state.items
+
     if not items:
         st.info("No items yet. Use the sidebar to add some!")
     else:
-        df = pd.DataFrame(items, columns=["ID", "Name", "Category", "Purchase Date",
-                                          "Expiration Date", "Quantity", "Unit"])
-        df["Status"] = df["Expiration Date"].apply(check_status)
-        
+        df = pd.DataFrame(items)
+
         # --- FILTER ---
         st.sidebar.header("🔍 Filter Items")
         status_options = ["✅ OK", "⚠️ Expiring Soon", "❌ Expired"]
         selected_status = st.sidebar.multiselect("Select statuses", status_options, default=[])
         filtered_df = df[df["Status"].isin(selected_status)] if selected_status else df
 
-        # --- DISPLAY TABLE ---
+        # --- DISPLAY ---
         st.subheader("📋 Food List")
         st.dataframe(filtered_df[["Name", "Category", "Expiration Date", "Quantity", "Unit", "Status"]], hide_index=True)
-        
+
         # --- DELETE ITEMS ---
         st.subheader("🗑️ Delete Items")
+        to_delete = []
         for _, row in filtered_df.iterrows():
             col1, col2 = st.columns([4,1])
             with col1:
                 st.write(f"{row['Name']} ({row['Quantity']} {row['Unit']}) - {row['Status']}")
             with col2:
                 if st.button("🗑️ Delete", key=f"del_{row['ID']}"):
-                    delete_food_item(user_id, row["ID"])
-                    st.session_state.items = get_all_food_items(user_id)  # aggiorna lista
-
-        # --- COOK TODAY ---
-        st.subheader("🍽️ Meal Inspiration")
-        expiring_soon = df[df["Status"] == "⚠️ Expiring Soon"]
-        if st.button("What Can I Cook Today?"):
-            ingredients = ",".join(expiring_soon["Name"].tolist())
-            if ingredients:
-                spoonacular_key = "f05378d894eb4eb8b187551e2a492c49"
-                url = f"https://api.spoonacular.com/recipes/findByIngredients?ingredients={ingredients}&number=1&ranking=1&apiKey={spoonacular_key}"
-                with st.spinner("Finding recipe..."):
-                    try:
-                        recipes = requests.get(url).json()
-                        if recipes:
-                            recipe = recipes[0]
-                            st.markdown(f"### 👨‍🍳 {recipe['title']}")
-                            st.image(recipe.get("image",""), width=400)
-                            steps_url = f"https://api.spoonacular.com/recipes/{recipe['id']}/analyzedInstructions?apiKey={spoonacular_key}"
-                            steps_resp = requests.get(steps_url).json()
-                            if steps_resp and steps_resp[0].get("steps"):
-                                st.markdown("**Steps:**")
-                                for step in steps_resp[0]["steps"]:
-                                    st.markdown(f"**{step['number']}.** {step['step']}")
-                            else:
-                                st.info("No detailed instructions available.")
-                        else:
-                            st.warning("No recipes found with those ingredients.")
-                    except Exception as e:
-                        st.error(f"Error fetching recipe: {e}")
-            else:
-                st.success("No items are expiring soon — nothing urgent to cook!")
+                    to_delete.append(row["ID"])
+        # delete all selected
+        for item_id in to_delete:
+            delete_food_item(user_id, item_id)
+        if to_delete:
+            refresh_items()
+            st.success(f"{len(to_delete)} item(s) deleted!")
 
         # --- STATISTICS ---
         st.subheader("📈 General Analysis")
@@ -181,4 +156,10 @@ else:
             if expired_items > 0:
                 st.warning(f"💸 Estimated Economic Loss: €{lost_value:.2f}")
             else:
-                st.info("No food waste detected! 🎉")
+                st.info("No food waste detected!")
+
+    # --- LOGOUT ---
+    if st.sidebar.button("Logout"):
+        st.session_state.user_id = None
+        st.session_state.items = []
+        st.success("Logged out successfully!")

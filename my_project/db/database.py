@@ -3,15 +3,11 @@ import os
 import hashlib
 
 # ---------------------- PATH DB ----------------------
-def get_db_path():
+def create_connection():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(base_dir, "data")
     os.makedirs(data_dir, exist_ok=True)
-    return os.path.join(data_dir, "food_items.db")
-
-# ---------------------- CONNECTION ----------------------
-def create_connection():
-    db_path = get_db_path()
+    db_path = os.path.join(data_dir, "food_items.db")
     conn = sqlite3.connect(db_path)
     return conn
 
@@ -19,8 +15,8 @@ def create_connection():
 def initialize_db():
     conn = create_connection()
     c = conn.cursor()
-    
-    # Create users table
+
+    # Users table
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,8 +24,8 @@ def initialize_db():
             password_hash TEXT NOT NULL
         )
     ''')
-    
-    # Create food items table
+
+    # Food items table
     c.execute('''
         CREATE TABLE IF NOT EXISTS food_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,20 +39,17 @@ def initialize_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )
     ''')
-    
-    conn.commit()
 
-    # Create a default test user if not exists
+    # Create test user if not exists
     test_username = "prova"
     test_password = "1234"
     c.execute("SELECT * FROM users WHERE username = ?", (test_username,))
     if not c.fetchone():
         password_hash = hashlib.sha256(test_password.encode()).hexdigest()
-        c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", 
+        c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)",
                   (test_username, password_hash))
-        print(f"Utente di prova creato: {test_username} / {test_password}")
-        conn.commit()
 
+    conn.commit()
     conn.close()
 
 # ---------------------- USER FUNCTIONS ----------------------
@@ -67,14 +60,14 @@ def register_user(username, password):
     conn = create_connection()
     c = conn.cursor()
     try:
-        c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", 
+        c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)",
                   (username, hash_password(password)))
         conn.commit()
-        conn.close()
-        return True
     except sqlite3.IntegrityError:
         conn.close()
-        return False  # Username già esistente
+        return False
+    conn.close()
+    return True
 
 def login_user(username, password):
     conn = create_connection()
@@ -106,7 +99,19 @@ def get_all_food_items(user_id):
     """, (user_id,))
     rows = c.fetchall()
     conn.close()
-    return rows
+
+    items = []
+    for row in rows:
+        items.append({
+            "ID": row[0],
+            "Name": row[1],
+            "Category": row[2],
+            "Purchase Date": row[3],
+            "Expiration Date": row[4],
+            "Quantity": row[5],
+            "Unit": row[6]
+        })
+    return items
 
 def delete_food_item(user_id, item_id):
     conn = create_connection()
