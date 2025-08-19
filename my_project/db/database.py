@@ -1,22 +1,28 @@
 import sqlite3
 import os
-import pandas as pd
 
+def _users_dir():
+    # cartella dove mantenere i DB per utente
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    user_dir = os.path.join(base_dir, "data", "users")
+    os.makedirs(user_dir, exist_ok=True)
+    return user_dir
 
-db_path = "data/food_items.db"
+def _db_path_for_user(user: str) -> str:
+    safe_user = str(user).replace(os.sep, "_").replace("..", "_")
+    return os.path.join(_users_dir(), f"{safe_user}_food_items.db")
 
-def create_connection():
-    base_dir = os.path.dirname(os.path.abspath(__file__))  # this file's dir
-    db_path = os.path.join(base_dir, "data", "food_items.db")  # absolute path
-    print("Connecting to:", db_path)  # optional debug
-    conn = sqlite3.connect(db_path)
+def create_connection(user: str):
+    """Connessione al DB del singolo utente."""
+    path = _db_path_for_user(user)
+    conn = sqlite3.connect(path, check_same_thread=False)
     return conn
 
-
-def initialize_db():
-    conn = create_connection()
+def initialize_db(user: str):
+    """Crea la tabella per l'utente se non esiste."""
+    conn = create_connection(user)
     c = conn.cursor()
-    c.execute('''
+    c.execute("""
         CREATE TABLE IF NOT EXISTS food_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -26,12 +32,14 @@ def initialize_db():
             quantity REAL,
             unit TEXT
         )
-    ''')
+    """)
     conn.commit()
     conn.close()
 
-def insert_food_item(name, category, purchase_date, expiration_date, quantity, unit):
-    conn = create_connection()
+def insert_food_item(user: str, name: str, category: str,
+                     purchase_date: str, expiration_date: str,
+                     quantity: float, unit: str):
+    conn = create_connection(user)
     c = conn.cursor()
     c.execute("""
         INSERT INTO food_items (name, category, purchase_date, expiration_date, quantity, unit)
@@ -40,16 +48,16 @@ def insert_food_item(name, category, purchase_date, expiration_date, quantity, u
     conn.commit()
     conn.close()
 
-def get_all_food_items():
-    conn = create_connection()
+def get_all_food_items(user: str):
+    conn = create_connection(user)
     c = conn.cursor()
-    c.execute("SELECT * FROM food_items")
+    c.execute("SELECT id, name, category, purchase_date, expiration_date, quantity, unit FROM food_items")
     rows = c.fetchall()
     conn.close()
     return rows
 
-def delete_food_item(item_id):
-    conn = create_connection()
+def delete_food_item(user: str, item_id: int):
+    conn = create_connection(user)
     c = conn.cursor()
     c.execute("DELETE FROM food_items WHERE id = ?", (item_id,))
     conn.commit()
