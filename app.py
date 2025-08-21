@@ -55,7 +55,6 @@ with col2:
         st.rerun()
 
 # --- PAGE CONFIGURATION AND STYLE ---
-st.set_page_config(page_title="Food Waste Manager", layout="wide")
 
 st.markdown("""
 <style>
@@ -250,7 +249,7 @@ else:
         st.warning(f"Are you sure you want to delete '{name}'?")
         col_a, col_b = st.columns(2)
         if col_a.button("✅ Yes, delete"):
-            delete_food_item(item_id)
+            delete_food_item(item_id, user)
             st.success(f"'{name}' has been deleted!")
             st.rerun()
         if col_b.button("❌ Cancel"):
@@ -325,4 +324,137 @@ else:
                 )
                
                 if st.button("🗑️ Delete", key=f"del_{row['ID']}"):
-                    co
+                    confirm_delete(row["ID"], row["Name"])
+    st.markdown("<hr>", unsafe_allow_html=True)
+       
+    # ---------- "What Can I Cook Today?" BUTTON ----------
+    st.subheader("🍽️ Meal Inspiration")
+    expiring_soon = df[df["Status"] == "⚠️ Expiring Soon"]
+
+
+
+
+    if st.button("What Can I Cook Today?"):
+        ingredients = expiring_soon["Name"].tolist()
+
+
+
+
+        if ingredients:
+            spoonacular_key = "f05378d894eb4eb8b187551e2a492c49"
+            st.info("Searching recipes for: " + ", ".join(ingredients))
+            query_ingredients = ",".join(ingredients)
+
+
+
+
+            url = f"https://api.spoonacular.com/recipes/findByIngredients?ingredients={query_ingredients}&number=1&ranking=1&apiKey={spoonacular_key}"
+
+
+
+
+            with st.spinner("Finding recipe..."):
+                try:
+                    response = requests.get(url)
+                    recipes = response.json()
+
+
+
+
+                    if isinstance(recipes, list) and recipes:
+                        recipe = recipes[0]
+                        title = recipe["title"]
+                        image = recipe.get("image", "")
+                        recipe_id = recipe["id"]
+
+
+
+
+                        st.markdown(f"### 👨‍🍳 {title}")
+                        if image:
+                            st.image(image, width=400)
+
+
+
+
+                        instructions_url = f"https://api.spoonacular.com/recipes/{recipe_id}/analyzedInstructions?apiKey={spoonacular_key}"
+                        instructions_response = requests.get(instructions_url).json()
+
+
+
+
+                        if instructions_response and isinstance(instructions_response, list) and instructions_response[0].get("steps"):
+                            steps = instructions_response[0]["steps"]
+                            st.markdown("*Steps:*")
+                            for step in steps:
+                                st.markdown(f"*{step['number']}.* {step['step']}")
+                        else:
+                            st.info("No detailed instructions available.")
+                    else:
+                        st.warning("No recipes found with those ingredients.")
+                except Exception as e:
+                    st.error(f"Error fetching recipe: {e}")
+        else:
+            st.success("No items are expiring soon — nothing urgent to cook!")
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+
+
+
+    # ---------- PIE CHART + STATISTICS ----------
+    st.subheader("📈 General Analysis")
+    col1, col2 = st.columns(2)
+
+
+
+
+    with col1:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.subheader("🥧 Status Overview")
+        status_counts = df["Status"].value_counts()
+       
+        status_colors = {
+            "❌ Expired": "#ffcccc",
+            "⚠️ Expiring Soon": "#fff2cc",
+            "✅ OK": "#ccffcc"
+        }
+
+
+
+
+        fig = px.pie(
+            names=status_counts.index,
+            values=status_counts.values,
+            title="Food Status Distribution",
+            color=status_counts.index,
+            color_discrete_map=status_colors
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+
+
+
+    with col2:
+        total_items, expired_items, ok_items = calculate_statistics(df)
+        lost_value = expired_items * 2.5 if expired_items > 0 else 0
+
+
+        st.markdown(
+            f"""
+            <div class="stats-box">
+                <h3 style="margin-top:0;">📊 Waste Statistics</h3>
+                <br>
+                <strong>Total Items:</strong> {total_items}<br>
+                <strong>Expired Items:</strong> {expired_items}<br>
+                <strong>OK / Expiring Soon Items:</strong> {ok_items}
+                <br>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+
+        if expired_items > 0:
+            st.warning(f"💸 Estimated Economic Loss: *€{lost_value:.2f}*")
+        else:
+            st.info("No food waste detected! Yey")
