@@ -31,8 +31,11 @@ def check_status(exp_date_str):
 
 # ----------------------------------------------------------------------------------
 
+import streamlit as st
+
 # Initialize DB
 initialize_db()
+
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Wasted", layout="wide")
@@ -42,15 +45,41 @@ if "user" not in st.session_state:
     st.session_state.user = None
 
 if not st.session_state.user:
-    st.title("Welcome to Wasted!")
-    username = st.text_input("Enter your username:")
-    if st.button("Login"):
-        if username.strip():
-            st.session_state.user = username.strip()
-            st.success(f"Welcome {st.session_state.user}!")
-            st.rerun()
-        else:
-            st.error("Please enter a username.")
+    # Sfondo
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-image: url("https://i.pinimg.com/1200x/e0/28/8d/e0288dc89489bea01db65c12a176e8a8.jpg");
+            background-size: cover;
+            background-position: center;
+        }
+        /* Applica lo stile SOLO al blocco che contiene #login-marker */
+        div[data-testid="stVerticalBlock"]:has(#login-marker) {
+            background-color: rgba(255, 255, 255, 0.92); /* bianco con trasparenza */
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.30);
+            max-width: 520px;
+            margin: 60px auto; /* centra orizzontalmente; se lo vuoi a sx usa: margin:60px 0 0 60px */
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Un solo container per il login
+    with st.container():
+        st.markdown('<span id="login-marker"></span>', unsafe_allow_html=True)  # marcatore
+        st.title("Welcome!")
+        username = st.text_input("Enter your username, if it's your first time here just join us!")
+        if st.button("Login"):
+            if username.strip():
+                st.session_state.user = username.strip()
+                st.success(f"Welcome {st.session_state.user}!")
+                st.rerun()
+            else:
+                st.error("Please enter a username.")
     st.stop()
 
 # --- GLOBAL CSS ---
@@ -160,7 +189,7 @@ html[data-theme="dark"] .stats-box {
 st.markdown(
     """
     <div id="banner" class="full-bleed">
-        <img src="https://i.pinimg.com/736x/c6/49/90/c64990fc753fdcfbf18fe193690fd5e9.jpg"
+        <img src="https://i.pinimg.com/1200x/e0/28/8d/e0288dc89489bea01db65c12a176e8a8.jpg"
              alt="Food banner"
              style="width:100%; height:300px; object-fit:cover;"/>
     </div>

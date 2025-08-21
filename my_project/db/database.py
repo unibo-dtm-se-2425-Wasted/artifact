@@ -13,7 +13,7 @@ def initialize_db():
     c.execute('''
         CREATE TABLE IF NOT EXISTS food_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user TEXT NOT NULL,
+            user TEXT NOT NULL COLLATE NOCASE,   -- 🔑 qui NOCASE
             name TEXT NOT NULL,
             category TEXT,
             purchase_date TEXT,
@@ -28,6 +28,7 @@ def initialize_db():
 def insert_food_item(user, name, category, purchase_date, expiration_date, quantity, unit):
     conn = create_connection()
     c = conn.cursor()
+    # 🔑 NON normalizziamo più → salvi esattamente come arriva
     c.execute("""
         INSERT INTO food_items (user, name, category, purchase_date, expiration_date, quantity, unit)
         VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -38,7 +39,8 @@ def insert_food_item(user, name, category, purchase_date, expiration_date, quant
 def get_all_food_items(user):
     conn = create_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM food_items WHERE user=?", (user,))
+    # 🔑 il confronto è case-insensitive grazie a COLLATE NOCASE
+    c.execute("SELECT * FROM food_items WHERE user = ? COLLATE NOCASE", (user,))
     rows = c.fetchall()
     conn.close()
     return rows
@@ -46,16 +48,16 @@ def get_all_food_items(user):
 def delete_food_item(item_id, user):
     conn = create_connection()
     c = conn.cursor()
-    c.execute("DELETE FROM food_items WHERE id = ? AND user = ?", (item_id, user))
+    c.execute("DELETE FROM food_items WHERE id = ? AND user = ? COLLATE NOCASE", (item_id, user))
     conn.commit()
     conn.close()
 
 def get_unique_users():
     conn = create_connection()
     c = conn.cursor()
-    c.execute("SELECT DISTINCT user FROM food_items")
-    # Fetchall restituisce una lista di tuple. Es: [('user1',), ('user2',)]
+    # DISTINCT case-insensitive (collate applicato alla colonna, non alla tabella)
+    c.execute("SELECT DISTINCT user COLLATE NOCASE FROM food_items")
     rows = c.fetchall()
     conn.close()
-    # Usiamo una list comprehension per estrarre solo i nomi utente
     return [row[0] for row in rows]
+
