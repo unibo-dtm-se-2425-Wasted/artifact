@@ -55,6 +55,7 @@ with col2:
         st.rerun()
 
 # --- PAGE CONFIGURATION AND STYLE ---
+st.set_page_config(page_title="Food Waste Manager", layout="wide")
 
 st.markdown("""
 <style>
