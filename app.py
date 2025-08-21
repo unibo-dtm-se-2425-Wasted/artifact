@@ -4,25 +4,34 @@ from datetime import datetime
 import plotly.express as px
 import requests
 
-from db.database import initialize_db, insert_food_item, get_all_food_items
+from my_project.db.database import initialize_db, insert_food_item, get_all_food_items, delete_food_item
 
-# ----------------------- INIT -----------------------------------------------
+# --- LOGIC FUNCTIONS ---
+def calculate_statistics(df):
+    total_items = len(df)
+    expired_items = len(df[df['Status'] == '❌ Expired'])
+    ok_items = len(df[df['Status'] == '✅ OK']) + len(df[df['Status'] == '⚠️ Expiring Soon'])
+    return total_items, expired_items, ok_items
+
+def check_status(exp_date_str):
+    today = datetime.today().date()
+    exp = datetime.strptime(exp_date_str, "%Y-%m-%d").date()
+    if exp < today:
+        return "❌ Expired"
+    elif (exp - today).days <= 3:
+        return "⚠️ Expiring Soon"
+    else:
+        return "✅ OK"
+
+# ----------------------------------------------------------------------------------
+
+# Initialize DB
 initialize_db()
+
+# --- PAGE CONFIG ---
 st.set_page_config(page_title="Food Waste Manager", layout="wide")
 
-# --- Style overrides (buttons, etc.)
-st.markdown("""
-<style>
-.stButton > button {
-    background-color:#4CAF50; color:white; border:none; border-radius:6px; padding:0.5em 1em;
-}
-.logout > button {
-    background-color:#e94e4e; color:white; border:none; border-radius:6px; padding:0.4em 0.8em;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ----------------------- LOGIN ----------------------------------------------
+# --- LOGIN HANDLING ---
 if "user" not in st.session_state:
     st.session_state.user = None
 
@@ -38,102 +47,282 @@ if not st.session_state.user:
             st.error("Please enter a username.")
     st.stop()
 
-# ----------------------- LOGOUT BUTTON --------------------------------------
+# --- LOGOUT BUTTON ---
 col1, col2 = st.columns([7,1])
 with col2:
-    if st.button("Logout", key="logout"):
+    if st.button("Logout", key="logout", type="primary"):
         st.session_state.user = None
         st.rerun()
 
-# ---------------------- MAIN APP -------------------------------------------
+# --- PAGE CONFIGURATION AND STYLE ---
+st.set_page_config(page_title="Food Waste Manager", layout="wide")
+
+st.markdown("""
+<style>
+/* -------------------- STATUS BOXES -------------------- */
+.ok-box {
+    border: 1px solid #2e6c46;
+    background-color: rgba(46, 108, 70, 0.2);
+    border-radius: 5px;
+    padding: 10px;
+    margin-bottom: 5px;
+    color: var(--text-color);
+}
+.soon-box {
+    border: 1px solid #ad8600;
+    background-color: rgba(173, 134, 0, 0.2);
+    border-radius: 5px;
+    padding: 10px;
+    margin-bottom: 5px;
+    color: var(--text-color);
+}
+.expired-box {
+    border: 1px solid #a60000;
+    background-color: rgba(166, 0, 0, 0.2);
+    border-radius: 5px;
+    padding: 10px;
+    margin-bottom: 5px;
+    color: var(--text-color);
+}
+
+
+/* -------------------- STATUS BADGES -------------------- */
+.status-badge {
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-weight: bold;
+    text-align: center;
+    color: white;
+}
+.status-badge.ok {
+    background-color: #2e6c46;
+}
+.status-badge.soon {
+    background-color: #ad8600;
+}
+.status-badge.expired {
+    background-color: #a60000;
+}
+
+
+/* -------------------- STATISTICS BOX -------------------- */
+/* light */
+.stats-box {
+    border: 2px solid #fffce4;
+    background-color: #fffce4;
+    border-radius: 5px;
+    padding: 15px;
+    margin-top: 15px;
+    color: #000000;
+}
+
+
+/* dark */
+html[data-theme="dark"] .stats-box {
+    border: 2px solid #faca2b;
+    background-color: #faca2b;
+    color: #000000;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+
+# --- MAIN APP ---
 user = st.session_state.user
 st.title(f"🥦 Food Waste Manager — {user}'s fridge")
+# (tutto il resto del tuo codice rimane identico, ma con:)
+# - insert_food_item(user, ...)
+# - get_all_food_items(user)
+# - delete_food_item(item_id, user)
 
-# ------ SIDEBAR ADD FORM ----------------------------------------------------
+# ---------- POPUP SUCCESS DIALOG ----------
+@st.dialog("✅ Item Added")
+def success_popup(name):
+    st.success(f"'{name}' has been added to your fridge!")
+    if st.button("OK"):
+        st.rerun()
+
+
+
+
+# ---------- SIDEBAR: ADD ITEM ----------
 with st.sidebar.form("add_food"):
-    st.header("➕ Add New Food Item")
+    st.header("➕ Add a new item")
+
+
+
+
     name = st.text_input("Product Name")
-    category = st.selectbox("Category", ["Dairy", "Vegetables", "Meat", "Fruit", "Beverage", "Other"])
+    category = st.selectbox("Category", ["Dairy", "Vegetables", "Meat", "Fruit", "Drinks", "Fish", "Other"])
     purchase_date = st.date_input("Purchase Date", datetime.today())
     expiration_date = st.date_input("Expiration Date")
     quantity = st.number_input("Quantity", min_value=0.0, step=0.1)
-    unit = st.text_input("Unit (e.g. kg, pack)")
-    submitted = st.form_submit_button("Add Item")
-    if submitted and name:
-        insert_food_item(user, name, category, purchase_date, expiration_date, quantity, unit)
-        st.success(f"'{name}' added.")
-        st.rerun()
+    unit = st.text_input("Unit (e.g., kg, pcs, lt)")
 
-# --------- VIEW ITEMS --------------------------------------------------------
+
+
+
+    submitted = st.form_submit_button("Add Item")
+
+
+
+
+    if submitted:
+        if not name.strip():
+            st.toast("⚠️ Please write down your item before adding!", icon="⚠️")
+        else:
+            insert_food_item(user, name, category, purchase_date, expiration_date, quantity, unit)
+            success_popup(name)  # 🔥 Popup in center
+
+
+
+
+
+
+
+
+# ---------- SIDEBAR: MULTI-SELECT FILTERS ----------
+with st.sidebar:
+    st.header("🔍 Filter Items")
+    status_options = ["✅ OK", "⚠️ Expiring Soon", "❌ Expired"]
+    selected_status = st.multiselect(
+        "Select one or more statuses",
+        options=status_options,
+        default=[]  # Empty = show all
+    )
+
+
+
+
+# ---------- DISPLAY ITEMS ----------
 st.subheader("📋 Food List")
+
+
+
+
 items = get_all_food_items(user)
 
-if items:
-    df = pd.DataFrame(items, columns=["ID","User","Name","Category","Purchase Date","Expiration Date","Quantity","Unit"])
 
-    def status(exp_date):
-        today = datetime.today().date()
-        if not isinstance(exp_date,str): return "Unknown"
-        try: d = datetime.strptime(exp_date,"%Y-%m-%d").date()
-        except: return "Unknown"
-        if d < today: return "❌ Expired"
-        if (d - today).days <= 3: return "⚠️ Expiring Soon"
-        return "✅ OK"
 
-    df["Status"] = df["Expiration Date"].apply(status)
-    expiring = df[df["Status"]=="⚠️ Expiring Soon"]
-    expired = df[df["Status"]=="❌ Expired"]
 
-    if not expiring.empty:
-        st.warning("⚠️ Expiring Soon:")
-        st.table(expiring[["Name","Expiration Date","Quantity","Unit"]])
-    if not expired.empty:
-        st.error("❌ Already Expired:")
-        st.table(expired[["Name","Expiration Date","Quantity","Unit"]])
-
-    st.dataframe(df[["Name","Category","Purchase Date","Expiration Date","Quantity","Unit","Status"]])
-
-    # ---------- MEAL SUGGEST --------------------------------------------------
-    st.subheader("🍽️ Meal Inspiration")
-    if st.button("What can I cook?"):
-        ingred = expiring["Name"].tolist()
-        if ingred:
-            key = "f05378d894eb4eb8b187551e2a492c49"
-            q = ",".join(ingred)
-            url = f"https://api.spoonacular.com/recipes/findByIngredients?ingredients={q}&number=1&ranking=1&apiKey={key}"
-            try:
-                r=requests.get(url).json()
-                if isinstance(r,list) and r:
-                    rec=r[0]
-                    st.markdown(f"### 👨‍🍳 {rec['title']}")
-                    if rec.get("image"): st.image(rec["image"])
-                    steps=requests.get(f"https://api.spoonacular.com/recipes/{rec['id']}/analyzedInstructions?apiKey={key}").json()
-                    if steps and steps[0].get("steps"):
-                        for s in steps[0]["steps"]:
-                            st.markdown(f"**{s['number']}.** {s['step']}")
-                    else:
-                        st.info("No steps available.")
-                else:
-                    st.warning("No recipe found.")
-            except Exception as e:
-                st.error(str(e))
-        else:
-            st.success("Nothing urgent to cook!")
-
-    # ---------- STATS ---------------------------------------------------------
-    st.subheader("🥧 Status Overview")
-    fig = px.pie(names=df["Status"].value_counts().index,
-                 values=df["Status"].value_counts().values)
-    st.plotly_chart(fig,use_container_width=True)
-
-    st.subheader("📊 Waste Statistics")
-    total=len(df); exp=len(expired); ok=total-exp
-    st.metric("Total Items",total)
-    st.metric("Expired",exp)
-    st.metric("Consumed/OK",ok)
-    if exp>0:
-        loss = exp*2.5
-        st.write(f"💸 Estimated loss: **€{loss:.2f}**")
-
+if not items:
+    st.info("No items yet. Use the sidebar to add some!")
 else:
-    st.info("Add your first food item from the sidebar.")
+    df = pd.DataFrame(
+        items,
+        columns=["ID", "Name", "Category", "Purchase Date", "Expiration Date", "Quantity", "Unit"]
+    ).reset_index(drop=True)
+
+
+
+
+    df["Status"] = df["Expiration Date"].apply(check_status)
+
+
+
+
+    # Filter based on multi-selection
+    filtered_df = df.copy()
+    if selected_status:
+        filtered_df = df[df["Status"].isin(selected_status)]
+
+
+
+
+    # Filtered Table
+    if filtered_df.empty:
+        st.info("No items match the selected filters.")
+    else:
+        st.dataframe(
+            filtered_df[["Name", "Category", "Expiration Date", "Quantity", "Unit", "Status"]]
+            .reset_index(drop=True),
+            hide_index=True
+        )
+
+
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+
+    # ---------- DELETE CONFIRMATION FUNCTION ----------
+    @st.dialog("Confirm Deletion")
+    def confirm_delete(item_id, name):
+        st.warning(f"Are you sure you want to delete '{name}'?")
+        col_a, col_b = st.columns(2)
+        if col_a.button("✅ Yes, delete"):
+            delete_food_item(item_id)
+            st.success(f"'{name}' has been deleted!")
+            st.rerun()
+        if col_b.button("❌ Cancel"):
+            st.rerun()
+
+
+
+
+    # --- DELETE ITEMS CONTAINERS (UPDATED SECTION) ---
+    st.subheader("🗑️ Delete Items in the Fridge")
+
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+
+    items_to_display = filtered_df.iterrows()
+   
+    col1, col2 = st.columns(2)
+
+
+
+
+    for index, row in items_to_display:
+        status_class = "ok" if "✅ OK" in row["Status"] else "soon" if "⚠️ Expiring Soon" in row["Status"] else "expired"
+        box_class = f"{status_class}-box"
+
+
+
+
+        if index % 2 == 0:
+            with col1:
+                # Use a single markdown block for all item info
+                st.markdown(
+                    f"""
+                    <div class="{box_class}">
+                        <div style="display:flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight:bold;">{row['Name']}</span>
+                            <div class="status-badge {status_class}">{row['Status'].split(' ')[1]}</div>
+                        </div>
+                        <br>
+                        <strong>Category:</strong> {row['Category']}<br>
+                        <strong>Expiration Date:</strong> {row['Expiration Date']}<br>
+                        <strong>Quantity:</strong> {row['Quantity']} {row['Unit']}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+               
+                # Button is outside the colored box
+                if st.button("🗑️ Delete", key=f"del_{row['ID']}"):
+                    confirm_delete(row["ID"], row["Name"])
+
+
+
+
+        else:
+            with col2:
+                st.markdown(
+                    f"""
+                    <div class="{box_class}">
+                        <div style="display:flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight:bold;">{row['Name']}</span>
+                            <div class="status-badge {status_class}">{row['Status'].split(' ')[1]}</div>
+                        </div>
+                        <br>
+                         <strong>Category:</strong> {row['Category']}<br>
+                        <strong>Expiration Date:</strong> {row['Expiration Date']}<br>
+                        <strong>Quantity:</strong> {row['Quantity']} {row['Unit']}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+               
+                if st.button("🗑️ Delete", key=f"del_{row['ID']}"):
+                    co
