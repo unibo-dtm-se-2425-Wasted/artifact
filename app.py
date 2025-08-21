@@ -3,145 +3,137 @@ import pandas as pd
 from datetime import datetime
 import plotly.express as px
 import requests
-from my_project.db.database import (
-    login_user,
-    register_user,
-    insert_food_item,
-    get_all_food_items,
-    delete_food_item,
-    initialize_db
-)
 
-# Initialize DB
+from db.database import initialize_db, insert_food_item, get_all_food_items
+
+# ----------------------- INIT -----------------------------------------------
 initialize_db()
-
-# ---------------------- UTILITY ----------------------
-def check_status(exp_date_str):
-    today = datetime.today().date()
-    exp = datetime.strptime(exp_date_str, "%Y-%m-%d").date()
-    if exp < today:
-        return "❌ Expired"
-    elif (exp - today).days <= 3:
-        return "⚠️ Expiring Soon"
-    else:
-        return "✅ OK"
-
-def calculate_statistics(df):
-    total_items = len(df)
-    expired_items = len(df[df['Status'] == '❌ Expired'])
-    ok_items = len(df[df['Status'] == '✅ OK']) + len(df[df['Status'] == '⚠️ Expiring Soon'])
-    lost_value = expired_items * 2.5
-    return total_items, expired_items, ok_items, lost_value
-
-# ---------------------- APP ----------------------
 st.set_page_config(page_title="Food Waste Manager", layout="wide")
 
-if "user_id" not in st.session_state:
-    st.session_state.user_id = None
+# --- Style overrides (buttons, etc.)
+st.markdown("""
+<style>
+.stButton > button {
+    background-color:#4CAF50; color:white; border:none; border-radius:6px; padding:0.5em 1em;
+}
+.logout > button {
+    background-color:#e94e4e; color:white; border:none; border-radius:6px; padding:0.4em 0.8em;
+}
+</style>
+""", unsafe_allow_html=True)
 
-if st.session_state.user_id is None:
-    tab1, tab2 = st.tabs(["Login", "Register"])
+# ----------------------- LOGIN ----------------------------------------------
+if "user" not in st.session_state:
+    st.session_state.user = None
 
-    with tab1:
-        st.subheader("🔑 Login")
-        username = st.text_input("Username", key="login_user")
-        password = st.text_input("Password", type="password", key="login_pass")
-        if st.button("Login"):
-            user_id = login_user(username, password)
-            if user_id:
-                st.session_state.user_id = user_id
-                st.success(f"Welcome back, {username}!")
-            else:
-                st.error("Invalid username or password")
+if not st.session_state.user:
+    st.title("🥦 Food Waste Manager — Login")
+    username = st.text_input("Enter your username:")
+    if st.button("Login"):
+        if username.strip():
+            st.session_state.user = username.strip()
+            st.success(f"Welcome {st.session_state.user}!")
+            st.rerun()
+        else:
+            st.error("Please enter a username.")
+    st.stop()
 
-    with tab2:
-        st.subheader("📝 Register")
-        new_username = st.text_input("Username", key="reg_user")
-        new_password = st.text_input("Password", type="password", key="reg_pass")
-        if st.button("Register"):
-            success = register_user(new_username, new_password)
-            if success:
-                st.success("User registered! You can now login.")
-            else:
-                st.error("Username already exists")
+# ----------------------- LOGOUT BUTTON --------------------------------------
+col1, col2 = st.columns([7,1])
+with col2:
+    if st.button("Logout", key="logout"):
+        st.session_state.user = None
+        st.rerun()
+
+# ---------------------- MAIN APP -------------------------------------------
+user = st.session_state.user
+st.title(f"🥦 Food Waste Manager — {user}'s fridge")
+
+# ------ SIDEBAR ADD FORM ----------------------------------------------------
+with st.sidebar.form("add_food"):
+    st.header("➕ Add New Food Item")
+    name = st.text_input("Product Name")
+    category = st.selectbox("Category", ["Dairy", "Vegetables", "Meat", "Fruit", "Beverage", "Other"])
+    purchase_date = st.date_input("Purchase Date", datetime.today())
+    expiration_date = st.date_input("Expiration Date")
+    quantity = st.number_input("Quantity", min_value=0.0, step=0.1)
+    unit = st.text_input("Unit (e.g. kg, pack)")
+    submitted = st.form_submit_button("Add Item")
+    if submitted and name:
+        insert_food_item(user, name, category, purchase_date, expiration_date, quantity, unit)
+        st.success(f"'{name}' added.")
+        st.rerun()
+
+# --------- VIEW ITEMS --------------------------------------------------------
+st.subheader("📋 Food List")
+items = get_all_food_items(user)
+
+if items:
+    df = pd.DataFrame(items, columns=["ID","User","Name","Category","Purchase Date","Expiration Date","Quantity","Unit"])
+
+    def status(exp_date):
+        today = datetime.today().date()
+        if not isinstance(exp_date,str): return "Unknown"
+        try: d = datetime.strptime(exp_date,"%Y-%m-%d").date()
+        except: return "Unknown"
+        if d < today: return "❌ Expired"
+        if (d - today).days <= 3: return "⚠️ Expiring Soon"
+        return "✅ OK"
+
+    df["Status"] = df["Expiration Date"].apply(status)
+    expiring = df[df["Status"]=="⚠️ Expiring Soon"]
+    expired = df[df["Status"]=="❌ Expired"]
+
+    if not expiring.empty:
+        st.warning("⚠️ Expiring Soon:")
+        st.table(expiring[["Name","Expiration Date","Quantity","Unit"]])
+    if not expired.empty:
+        st.error("❌ Already Expired:")
+        st.table(expired[["Name","Expiration Date","Quantity","Unit"]])
+
+    st.dataframe(df[["Name","Category","Purchase Date","Expiration Date","Quantity","Unit","Status"]])
+
+    # ---------- MEAL SUGGEST --------------------------------------------------
+    st.subheader("🍽️ Meal Inspiration")
+    if st.button("What can I cook?"):
+        ingred = expiring["Name"].tolist()
+        if ingred:
+            key = "f05378d894eb4eb8b187551e2a492c49"
+            q = ",".join(ingred)
+            url = f"https://api.spoonacular.com/recipes/findByIngredients?ingredients={q}&number=1&ranking=1&apiKey={key}"
+            try:
+                r=requests.get(url).json()
+                if isinstance(r,list) and r:
+                    rec=r[0]
+                    st.markdown(f"### 👨‍🍳 {rec['title']}")
+                    if rec.get("image"): st.image(rec["image"])
+                    steps=requests.get(f"https://api.spoonacular.com/recipes/{rec['id']}/analyzedInstructions?apiKey={key}").json()
+                    if steps and steps[0].get("steps"):
+                        for s in steps[0]["steps"]:
+                            st.markdown(f"**{s['number']}.** {s['step']}")
+                    else:
+                        st.info("No steps available.")
+                else:
+                    st.warning("No recipe found.")
+            except Exception as e:
+                st.error(str(e))
+        else:
+            st.success("Nothing urgent to cook!")
+
+    # ---------- STATS ---------------------------------------------------------
+    st.subheader("🥧 Status Overview")
+    fig = px.pie(names=df["Status"].value_counts().index,
+                 values=df["Status"].value_counts().values)
+    st.plotly_chart(fig,use_container_width=True)
+
+    st.subheader("📊 Waste Statistics")
+    total=len(df); exp=len(expired); ok=total-exp
+    st.metric("Total Items",total)
+    st.metric("Expired",exp)
+    st.metric("Consumed/OK",ok)
+    if exp>0:
+        loss = exp*2.5
+        st.write(f"💸 Estimated loss: **€{loss:.2f}**")
 
 else:
-    user_id = st.session_state.user_id
-    st.title("🥦 Food Waste Manager")
-
-    # --- ADD ITEM SIDEBAR ---
-    with st.sidebar.form("add_food"):
-        st.header("➕ Add a new item")
-        name = st.text_input("Product Name")
-        category = st.selectbox("Category", ["Dairy", "Vegetables", "Meat", "Fruit", "Drinks", "Fish", "Other"])
-        purchase_date = st.date_input("Purchase Date", datetime.today())
-        expiration_date = st.date_input("Expiration Date")
-        quantity = st.number_input("Quantity", min_value=0.0, step=0.1)
-        unit = st.text_input("Unit (e.g., kg, pcs, lt)")
-        submitted = st.form_submit_button("Add Item")
-
-        if submitted:
-            if not name.strip():
-                st.warning("⚠️ Please write down your item before adding!")
-            else:
-                insert_food_item(user_id, name, category, purchase_date.strftime("%Y-%m-%d"),
-                                 expiration_date.strftime("%Y-%m-%d"), quantity, unit)
-                st.success(f"'{name}' has been added to your fridge!")
-
-    # --- GET ITEMS ---
-    items = get_all_food_items(user_id)
-    if not items:
-        st.info("No items yet. Use the sidebar to add some!")
-    else:
-        df = pd.DataFrame(items)
-        df["Status"] = df["Expiration Date"].apply(check_status)
-
-        # --- FILTER ---
-        st.sidebar.header("🔍 Filter Items")
-        status_options = ["✅ OK", "⚠️ Expiring Soon", "❌ Expired"]
-        selected_status = st.sidebar.multiselect("Select statuses", status_options, default=[])
-        filtered_df = df[df["Status"].isin(selected_status)] if selected_status else df
-
-        # --- DISPLAY ---
-        st.subheader("📋 Food List")
-        st.dataframe(filtered_df[["Name", "Category", "Expiration Date", "Quantity", "Unit", "Status"]], hide_index=True)
-
-        # --- DELETE ITEMS ---
-        st.subheader("🗑️ Delete Items")
-        for _, row in filtered_df.iterrows():
-            col1, col2 = st.columns([4,1])
-            with col1:
-                st.write(f"{row['Name']} ({row['Quantity']} {row['Unit']}) - {row['Status']}")
-            with col2:
-                if st.button("🗑️ Delete", key=f"del_{row['ID']}"):
-                    delete_food_item(user_id, row["ID"])
-                    st.experimental_rerun()  # opzionale, ma sicuro ora
-
-        # --- STATISTICS ---
-        st.subheader("📈 General Analysis")
-        col1, col2 = st.columns(2)
-        with col1:
-            status_counts = df["Status"].value_counts()
-            fig = px.pie(
-                names=status_counts.index,
-                values=status_counts.values,
-                color=status_counts.index,
-                color_discrete_map={"❌ Expired":"#ffcccc","⚠️ Expiring Soon":"#fff2cc","✅ OK":"#ccffcc"}
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        with col2:
-            total_items, expired_items, ok_items, lost_value = calculate_statistics(df)
-            st.markdown(f"""
-                **Total Items:** {total_items}  
-                **Expired Items:** {expired_items}  
-                **OK / Expiring Soon Items:** {ok_items}  
-            """)
-            if expired_items > 0:
-                st.warning(f"💸 Estimated Economic Loss: €{lost_value:.2f}")
-            else:
-                st.info("No food waste detected!")
-
-    # --- LOGOUT ---
-    if st.sidebar.button("Logout"):
-        st.session_state.user_id = None
-        st.experimental_rerun()
+    st.info("Add your first food item from the sidebar.")
