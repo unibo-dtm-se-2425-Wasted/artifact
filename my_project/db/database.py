@@ -39,7 +39,10 @@ def insert_food_item(user, name, category, purchase_date, expiration_date, quant
 def get_all_food_items(user):
     conn = create_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM food_items WHERE user=?", (user,))
+    c.execute("""
+        SELECT id, name, category, purchase_date, expiration_date, quantity, unit
+        FROM food_items WHERE user=?
+    """, (user,))
     rows = c.fetchall()
     conn.close()
     return rows
