@@ -4,7 +4,7 @@ from datetime import datetime
 import plotly.express as px
 import requests
 
-from my_project.db.database import initialize_db, insert_food_item, get_all_food_items, delete_food_item
+from my_project.db.database import initialize_db, insert_food_item, get_all_food_items, delete_food_item, get_unique_users
 
 # --- LOGIC FUNCTIONS ---
 def calculate_statistics(df):
@@ -176,12 +176,6 @@ with st.sidebar.form("add_food"):
             success_popup(name)  # 🔥 Popup in center
 
 
-
-
-
-
-
-
 # ---------- SIDEBAR: MULTI-SELECT FILTERS ----------
 with st.sidebar:
     st.header("🔍 Filter Items")
@@ -189,43 +183,48 @@ with st.sidebar:
     selected_status = st.multiselect(
         "Select one or more statuses",
         options=status_options,
-        default=[]  # Empty = show all
+        default=[],
+        key="status_filter" 
     )
 
-
-
+    st.markdown("<hr>", unsafe_allow_html=True)
+    st.header("👤 Filter User")
+    user_options = get_unique_users()
+    selected_users = st.multiselect(
+        "Select one or more users",
+        options=user_options,
+        default=user_options,
+        key="user_filter" 
+    )
 
 # ---------- DISPLAY ITEMS ----------
 st.subheader("📋 Food List")
 
-
-
-
+# Recupera tutti gli elementi del database, senza filtrare per un solo utente
+# Modifica la funzione get_all_food_items per recuperare tutto il db, se preferisci.
 items = get_all_food_items(user)
-
-
-
 
 if not items:
     st.info("No items yet. Use the sidebar to add some!")
 else:
     df = pd.DataFrame(
         items,
-        columns=["ID", "Name", "Category", "Purchase Date", "Expiration Date", "Quantity", "Unit"]
+        columns=["ID", "User", "Name", "Category", "Purchase Date", "Expiration Date", "Quantity", "Unit"]
     ).reset_index(drop=True)
-
-
-
 
     df["Status"] = df["Expiration Date"].apply(check_status)
 
-
-
-
-    # Filter based on multi-selection
+    # Filtra prima per utente, se ce ne sono di selezionati
     filtered_df = df.copy()
+    if selected_users:
+        filtered_df = filtered_df[filtered_df["User"].isin(selected_users)]
+
+    # Filtra poi per stato
     if selected_status:
-        filtered_df = df[df["Status"].isin(selected_status)]
+        filtered_df = filtered_df[filtered_df["Status"].isin(selected_status)]
+
+    # A questo punto il resto del tuo codice può usare filtered_df
+    # ...
 
 
 
@@ -235,7 +234,7 @@ else:
         st.info("No items match the selected filters.")
     else:
         st.dataframe(
-            filtered_df[["Name", "Category", "Expiration Date", "Quantity", "Unit", "Status"]]
+            filtered_df[["Name", "Category","Purchase Date", "Expiration Date", "Quantity", "Unit", "Status", "User"]]
             .reset_index(drop=True),
             hide_index=True
         )

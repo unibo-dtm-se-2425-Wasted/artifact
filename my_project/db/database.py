@@ -49,3 +49,13 @@ def delete_food_item(item_id, user):
     c.execute("DELETE FROM food_items WHERE id = ? AND user = ?", (item_id, user))
     conn.commit()
     conn.close()
+
+def get_unique_users():
+    conn = create_connection()
+    c = conn.cursor()
+    c.execute("SELECT DISTINCT user FROM food_items")
+    # Fetchall restituisce una lista di tuple. Es: [('user1',), ('user2',)]
+    rows = c.fetchall()
+    conn.close()
+    # Usiamo una list comprehension per estrarre solo i nomi utente
+    return [row[0] for row in rows]
