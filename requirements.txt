@@ -1,4 +1,6 @@
-streamlit
-pandas
-plotly
+
+streamlit==1.48.0
+pandas==2.3.0
+plotly==6.1.0
+streamlit-authenticator
 requests
