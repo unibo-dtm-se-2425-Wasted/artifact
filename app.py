@@ -10,6 +10,8 @@ from my_project.db.database import (
     get_all_food_items,
     delete_food_item,
     get_unique_users,
+    check_user_credentials,
+    add_user
 )
 
 # --- LOGIC FUNCTIONS ---
@@ -45,7 +47,6 @@ if "user" not in st.session_state:
     st.session_state.user = None
 
 if not st.session_state.user:
-    # Sfondo
     st.markdown(
         """
         <style>
@@ -54,32 +55,45 @@ if not st.session_state.user:
             background-size: cover;
             background-position: center;
         }
-        /* Applica lo stile SOLO al blocco che contiene #login-marker */
         div[data-testid="stVerticalBlock"]:has(#login-marker) {
-            background-color: rgba(255, 255, 255, 0.92); /* bianco con trasparenza */
+            background-color: rgba(255, 255, 255, 0.92);
             padding: 40px;
             border-radius: 16px;
             box-shadow: 0 8px 20px rgba(0,0,0,0.30);
             max-width: 520px;
-            margin: 60px auto; /* centra orizzontalmente; se lo vuoi a sx usa: margin:60px 0 0 60px */
+            margin: 60px auto;
         }
         </style>
         """,
         unsafe_allow_html=True
     )
 
-    # Un solo container per il login
     with st.container():
-        st.markdown('<span id="login-marker"></span>', unsafe_allow_html=True)  # marcatore
-        st.title("Welcome!")
-        username = st.text_input("Enter your username, if it's your first time here just join us!")
-        if st.button("Login"):
-            if username.strip():
-                st.session_state.user = username.strip()
-                st.success(f"Welcome {st.session_state.user}!")
-                st.rerun()
-            else:
-                st.error("Please enter a username.")
+        st.markdown('<span id="login-marker"></span>', unsafe_allow_html=True)
+        st.title("🔑 Welcome!")
+        tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
+
+        with tab_login:
+            username = st.text_input("Username", key="login_user")
+            password = st.text_input("Password", type="password", key="login_pass")
+            if st.button("Login"):
+                if check_user_credentials(username.strip(), password.strip()):
+                    st.session_state.user = username.strip()
+                    st.success(f"Welcome {st.session_state.user}!")
+                    st.rerun()
+                else:
+                    st.error("❌ Invalid username or password")
+
+        with tab_signup:
+            new_username = st.text_input("Choose a username", key="signup_user")
+            new_password = st.text_input("Choose a password", type="password", key="signup_pass")
+            if st.button("Create Account"):
+                if new_username.strip() and new_password.strip():
+                    add_user(new_username.strip(), new_password.strip())
+                    st.success("✅ Account created! Now you can login.")
+                else:
+                    st.error("⚠️ Please enter both username and password")
+
     st.stop()
 
 # --- GLOBAL CSS ---
@@ -191,7 +205,7 @@ st.markdown(
     <div id="banner" class="full-bleed">
         <img src="https://i.pinimg.com/1200x/e0/28/8d/e0288dc89489bea01db65c12a176e8a8.jpg"
              alt="Food banner"
-             style="width:100%; height:300px; object-fit:cover;"/>
+             style="width:100%; height:360px; object-fit:cover;"/>
     </div>
     """,
     unsafe_allow_html=True,
